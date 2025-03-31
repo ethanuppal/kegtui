@@ -2,18 +2,19 @@ use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     DefaultTerminal, Frame,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout, Margin, Rect},
     style::{Color, Modifier, Style, Stylize},
     symbols::line::VERTICAL,
-    text::{Line, Span},
+    text::{Line, Span, Text},
     widgets::{
-        Block, Borders, Clear, List, ListItem, ListState, Padding, Row, Table,
+        Block, Borders, Clear, List, ListItem, ListState, Padding, Paragraph,
+        Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table,
     },
 };
 use strum::{EnumCount, VariantNames};
 use strum_macros::{AsRefStr, EnumCount, FromRepr, VariantNames};
 
-#[derive(Clone, Copy, EnumCount)]
+#[derive(PartialEq, Eq, Clone, Copy, EnumCount)]
 #[repr(usize)]
 enum View {
     Main,
@@ -52,6 +53,7 @@ struct App {
     menu_states: [ListState; View::COUNT],
     focus: Focus,
     current_modal: Option<Modal>,
+    credits_vertical_scroll: usize,
 }
 
 impl App {
@@ -65,6 +67,7 @@ impl App {
             ],
             focus: Focus::Menu,
             current_modal: None,
+            credits_vertical_scroll: 0,
         }
     }
 
@@ -145,7 +148,7 @@ impl App {
     fn make_keybinds_help_table() -> Table<'static> {
         let rows = vec![
             Row::new(vec!["<?>".blue().bold(), "Toggle this modal ".into()]),
-            Row::new(vec!["<Esc>".blue().bold(), "Dismiss this modal ".into()]),
+            Row::new(vec!["<Esc>".blue().bold(), "Exit current view ".into()]),
             Row::new(vec![
                 Line::from(vec![
                     "<Left>".blue().bold(),
@@ -200,7 +203,11 @@ impl App {
         let menu = List::new(menu_items)
             .highlight_style(
                 Style::default()
-                    .fg(Color::Yellow)
+                    .fg(if self.focus == Focus::Menu {
+                        Color::Yellow
+                    } else {
+                        Color::Gray
+                    })
                     .add_modifier(Modifier::BOLD),
             )
             .highlight_symbol(">> ");
@@ -224,7 +231,69 @@ impl App {
                 {
                     MainMenuItem::Kegs => {}
                     MainMenuItem::Settings => {}
-                    MainMenuItem::Credits => {}
+                    MainMenuItem::Credits => {
+                        macro_rules! add_credits {
+                            (&mut $list:path, $source:literal) => {
+                                $list.push("".into());
+                                $list.push(concat!($source, ":").into());
+                                $list.extend(
+                                    textwrap::wrap(
+                                        include_str!(concat!(
+                                            env!("CARGO_MANIFEST_DIR"),
+                                            concat!(
+                                                "/resource/credits/",
+                                                $source,
+                                                ".txt"
+                                            )
+                                        )),
+                                        area.width as usize,
+                                    )
+                                    .iter()
+                                    .cloned()
+                                    .map(Line::from)
+                                    .map(|line| line.blue().into()),
+                                );
+                            };
+                        }
+                        let mut credits_list = vec![Line::from(
+                            "The following open-source projects were used to create this app.",
+                        )];
+                        add_credits!(&mut credits_list, "color-eyre");
+                        add_credits!(&mut credits_list, "crossterm");
+                        add_credits!(&mut credits_list, "ratatui");
+                        add_credits!(&mut credits_list, "strum");
+                        add_credits!(&mut credits_list, "strum_macros");
+                        add_credits!(&mut credits_list, "textwrap");
+                        add_credits!(&mut credits_list, "tokio");
+
+                        let credits_paragraph =
+                            Paragraph::new(credits_list.clone());
+
+                        let scrollbar =
+                            Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                                .begin_symbol(Some("↑"))
+                                .end_symbol(Some("↓"));
+
+                        let mut scrollbar_state =
+                            ScrollbarState::new(credits_list.len())
+                                .position(self.credits_vertical_scroll);
+
+                        frame.render_widget(
+                            credits_paragraph.scroll((
+                                self.credits_vertical_scroll as u16,
+                                0,
+                            )),
+                            area,
+                        );
+                        frame.render_stateful_widget(
+                            scrollbar,
+                            area.inner(Margin {
+                                vertical: 1,
+                                horizontal: 0,
+                            }),
+                            &mut scrollbar_state,
+                        );
+                    }
                 }
             }
             View::Keg => {
@@ -259,7 +328,11 @@ impl App {
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
             KeyCode::Esc => {
-                self.current_modal = None;
+                if self.current_modal.is_some() {
+                    self.current_modal = None;
+                } else if self.focus == Focus::Content {
+                    self.focus = Focus::Menu;
+                }
             }
             KeyCode::Char('?') => {
                 if self.current_modal.is_none() {
@@ -269,6 +342,9 @@ impl App {
                 }
             }
             KeyCode::Up | KeyCode::Char('k') => {
+                if self.current_modal == Some(Modal::KeybindsHelp) {
+                    return;
+                }
                 if self.focus == Focus::Menu {
                     let new_index = if current == 0 {
                         menu_length - 1
@@ -276,9 +352,22 @@ impl App {
                         current - 1
                     };
                     self.menu_state_mut().select(Some(new_index));
+                } else if self.focus == Focus::Content
+                    && self.current_view == View::Main
+                    && MainMenuItem::Credits as usize
+                        == self
+                            .menu_state_ref()
+                            .selected()
+                            .expect("Missing selection")
+                {
+                    self.credits_vertical_scroll =
+                        self.credits_vertical_scroll.saturating_sub(3);
                 }
             }
             KeyCode::Down | KeyCode::Char('j') => {
+                if self.current_modal == Some(Modal::KeybindsHelp) {
+                    return;
+                }
                 if self.focus == Focus::Menu {
                     let new_index = if current >= menu_length - 1 {
                         0
@@ -286,28 +375,45 @@ impl App {
                         current + 1
                     };
                     self.menu_state_mut().select(Some(new_index));
+                } else if self.focus == Focus::Content
+                    && self.current_view == View::Main
+                    && MainMenuItem::Credits as usize
+                        == self
+                            .menu_state_ref()
+                            .selected()
+                            .expect("Missing selection")
+                {
+                    self.credits_vertical_scroll =
+                        self.credits_vertical_scroll.saturating_add(3);
                 }
             }
             KeyCode::Left | KeyCode::Char('h') => {
+                if self.current_modal == Some(Modal::KeybindsHelp) {
+                    return;
+                }
+                if self.current_modal == Some(Modal::KeybindsHelp) {
+                    return;
+                }
                 self.focus = Focus::Menu;
             }
             KeyCode::Right | KeyCode::Char('l') => {
+                if self.current_modal == Some(Modal::KeybindsHelp) {
+                    return;
+                }
                 self.focus = Focus::Content;
             }
             KeyCode::Enter => {
+                if self.current_modal == Some(Modal::KeybindsHelp) {
+                    return;
+                }
                 if self.focus == Focus::Menu {
                     let items = self.menu_items();
                     if let Some(selected) = self.menu_state_ref().selected() {
                         let item = items[selected];
                         match self.current_view {
-                            //View::Main => {
-                            //    if item == MainMenuItem::Kegs.as_ref() {
-                            //        self.current_view = View::Keg;
-                            //        self.menu_state_mut().select(Some(
-                            //            KegMenuItem::Main as usize,
-                            //        ));
-                            //    }
-                            //}
+                            View::Main => {
+                                self.focus = Focus::Content;
+                            }
                             View::Keg => {
                                 if item == KegMenuItem::Back.as_ref() {
                                     self.current_view = View::Main;
