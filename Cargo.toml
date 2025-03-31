@@ -12,6 +12,8 @@ ratatui = "0.29.0"
 tokio = { version = "1.44.1", default-features = false, features = [
   "macros",
   "rt-multi-thread",
+  "time",
+  "sync",
 ] }
 strum_macros = "0.27.1"
 strum = "0.27.1"

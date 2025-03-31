@@ -1,14 +1,22 @@
-use color_eyre::Result;
+use std::{
+    ffi::OsString,
+    fs,
+    path::{Path, PathBuf},
+    sync::{Arc, RwLock},
+    time,
+};
+
+use color_eyre::{Result, eyre::eyre};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     DefaultTerminal, Frame,
     layout::{Constraint, Direction, Layout, Margin, Rect},
     style::{Color, Modifier, Style, Stylize},
     symbols::line::VERTICAL,
-    text::{Line, Span, Text},
+    text::{Line, Span},
     widgets::{
         Block, Borders, Clear, List, ListItem, ListState, Padding, Paragraph,
-        Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table,
+        Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table, Wrap,
     },
 };
 use strum::{EnumCount, VariantNames};
@@ -47,6 +55,23 @@ enum Modal {
     KeybindsHelp,
 }
 
+#[derive(Debug, Clone)]
+struct Keg {
+    config_file: PathBuf,
+    wineskin_launcher: OsString,
+}
+
+impl Keg {
+    fn from_path(path: &Path) -> Self {
+        Self {
+            config_file: path.join("Contents/Info.plist"),
+            wineskin_launcher: path
+                .join("Contents/MacOS/wineskinLauncher")
+                .into_os_string(),
+        }
+    }
+}
+
 struct App {
     exit: bool,
     current_view: View,
@@ -54,6 +79,8 @@ struct App {
     focus: Focus,
     current_modal: Option<Modal>,
     credits_vertical_scroll: usize,
+    kegs_vertical_scroll: usize,
+    current_keg: Option<Keg>,
 }
 
 impl App {
@@ -68,6 +95,8 @@ impl App {
             focus: Focus::Menu,
             current_modal: None,
             credits_vertical_scroll: 0,
+            kegs_vertical_scroll: 0,
+            current_keg: None,
         }
     }
 
@@ -78,15 +107,26 @@ impl App {
         }
     }
 
-    async fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
+    async fn run(
+        &mut self,
+        terminal: &mut DefaultTerminal,
+        list_of_kegs: Arc<RwLock<Vec<Keg>>>,
+    ) -> Result<()> {
+        let mut interval =
+            tokio::time::interval(time::Duration::from_millis(20));
+
         while !self.exit {
-            terminal.draw(|frame| self.draw(frame))?;
+            if let Ok(list_of_kegs) = list_of_kegs.read() {
+                terminal
+                    .draw(|frame| self.draw(frame, list_of_kegs.as_ref()))?;
+            }
             self.handle_events()?;
+            interval.tick().await;
         }
         Ok(())
     }
 
-    fn draw(&mut self, frame: &mut Frame<'_>) {
+    fn draw(&mut self, frame: &mut Frame<'_>, list_of_kegs: &[Keg]) {
         let area = frame.area();
 
         let main_block = Block::default()
@@ -94,9 +134,9 @@ impl App {
             .title(Span::from(" kegtui ").into_centered_line())
             .title_bottom(
                 Line::from(vec![
-                    " View key bindings ".into(),
+                    " View keybinds ".into(),
                     "<?>".blue().bold(),
-                    " ".into(),
+                    " | Copyright (C) 2025 Ethan Uppal ".into(),
                 ])
                 .centered(),
             );
@@ -118,7 +158,7 @@ impl App {
 
         self.draw_menu(frame, section_rects[0]);
         self.draw_vertical_separator(frame, section_rects[1]);
-        self.draw_content(frame, section_rects[2]);
+        self.draw_content(frame, section_rects[2], list_of_kegs);
 
         if self.current_modal == Some(Modal::KeybindsHelp) {
             let help = Self::make_keybinds_help_table();
@@ -147,15 +187,18 @@ impl App {
 
     fn make_keybinds_help_table() -> Table<'static> {
         let rows = vec![
-            Row::new(vec!["<?>".blue().bold(), "Toggle this modal ".into()]),
-            Row::new(vec!["<Esc>".blue().bold(), "Exit current view ".into()]),
+            Row::new(vec!["<?>".blue().bold(), "Toggle this modal".into()]),
+            Row::new(vec![
+                "<Esc>".blue().bold(),
+                "Exit modal, otherwise move to menu".into(),
+            ]),
             Row::new(vec![
                 Line::from(vec![
                     "<Left>".blue().bold(),
                     ", ".into(),
                     "<H>".blue().bold(),
                 ]),
-                "Focus menu ".into(),
+                "Focus menu".into(),
             ]),
             Row::new(vec![
                 Line::from(vec![
@@ -163,7 +206,7 @@ impl App {
                     ", ".into(),
                     "<L>".blue().bold(),
                 ]),
-                "Focus main view ".into(),
+                "Focus content".into(),
             ]),
             Row::new(vec![
                 Line::from(vec![
@@ -171,7 +214,7 @@ impl App {
                     ", ".into(),
                     "<K>".blue().bold(),
                 ]),
-                "Navigate up ".into(),
+                "Navigate up".into(),
             ]),
             Row::new(vec![
                 Line::from(vec![
@@ -179,13 +222,13 @@ impl App {
                     ", ".into(),
                     "<J>".blue().bold(),
                 ]),
-                "Navigate down ".into(),
+                "Navigate down".into(),
             ]),
-            Row::new(vec!["<Enter>".blue().bold(), "Select ".into()]),
             Row::new(vec![
-                "<Q>".blue().bold(),
-                "Exit app (if modal is not open) ".into(),
+                "<Enter>".blue().bold(),
+                "Select (e.g., menu item)".into(),
             ]),
+            Row::new(vec!["<Q>".blue().bold(), "Exit app".into()]),
         ];
         Table::new(
             rows,
@@ -221,7 +264,12 @@ impl App {
         }
     }
 
-    fn draw_content(&mut self, frame: &mut Frame<'_>, area: Rect) {
+    fn draw_content(
+        &mut self,
+        frame: &mut Frame<'_>,
+        area: Rect,
+        list_of_kegs: &[Keg],
+    ) {
         match self.current_view {
             View::Main => {
                 match MainMenuItem::from_repr(
@@ -229,7 +277,37 @@ impl App {
                 )
                 .expect("Invalid item selected")
                 {
-                    MainMenuItem::Kegs => {}
+                    MainMenuItem::Kegs => {
+                        let kegs_list = list_of_kegs
+                            .iter()
+                            .map(|keg| Line::from(format!("{keg:?}")))
+                            .collect::<Vec<_>>();
+                        let kegs_paragraph = Paragraph::new(kegs_list.clone());
+
+                        let scrollbar =
+                            Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                                .begin_symbol(Some("↑"))
+                                .end_symbol(Some("↓"));
+
+                        let mut scrollbar_state =
+                            ScrollbarState::new(kegs_list.len())
+                                .position(self.kegs_vertical_scroll);
+
+                        frame.render_widget(
+                            kegs_paragraph
+                                .wrap(Wrap { trim: false })
+                                .scroll((self.kegs_vertical_scroll as u16, 0)),
+                            area,
+                        );
+                        frame.render_stateful_widget(
+                            scrollbar,
+                            area.inner(Margin {
+                                vertical: 1,
+                                horizontal: 0,
+                            }),
+                            &mut scrollbar_state,
+                        );
+                    }
                     MainMenuItem::Settings => {}
                     MainMenuItem::Credits => {
                         macro_rules! add_credits {
@@ -312,12 +390,16 @@ impl App {
     }
 
     fn handle_events(&mut self) -> Result<()> {
-        match event::read()? {
-            Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
-                self.handle_key_event(key_event)
-            }
-            _ => {}
-        };
+        if event::poll(time::Duration::from_millis(5))? {
+            match event::read()? {
+                Event::Key(key_event)
+                    if key_event.kind == KeyEventKind::Press =>
+                {
+                    self.handle_key_event(key_event)
+                }
+                _ => {}
+            };
+        }
         Ok(())
     }
 
@@ -443,9 +525,44 @@ impl App {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let list_of_kegs = Arc::new(RwLock::new(vec![]));
+
+    let (quit_tx, mut quit_rx) = tokio::sync::oneshot::channel();
+
+    let list_of_kegs_clone = list_of_kegs.clone();
+    let worker = tokio::spawn(async move {
+        loop {
+            if quit_rx.try_recv().is_ok() {
+                break;
+            }
+            let mut kegs = vec![];
+            for enclosing_location in [
+                "/Applications",
+                "~/Applications/",
+                "~/Applications/Kegworks/",
+            ] {
+                if let Ok(read_dir) = fs::read_dir(enclosing_location) {
+                    for entry in read_dir.flatten() {
+                        if entry
+                            .path()
+                            .join("Contents/KegworksConfig.app")
+                            .exists()
+                        {
+                            kegs.push(Keg::from_path(&entry.path()));
+                        }
+                    }
+                }
+            }
+            if let Ok(mut lock) = list_of_kegs_clone.try_write() {
+                *lock = kegs;
+            }
+        }
+    });
+
     color_eyre::install()?;
     let mut terminal = ratatui::init();
-    let app_result = App::new().run(&mut terminal).await;
+    let app_result = App::new().run(&mut terminal, list_of_kegs).await;
+    quit_tx.send(()).or(Err(eyre!("bug: Could not send quit message to worker thread, so you have to use CTRL-C unfortunately")))?;
     ratatui::restore();
     app_result
 }
