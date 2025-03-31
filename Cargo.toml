@@ -6,3 +6,12 @@ license = "GPL-3.0-only"
 readme = "README.md"
 
 [dependencies]
+color-eyre = "0.6.3"
+crossterm = "0.28.1"
+ratatui = "0.29.0"
+tokio = { version = "1.44.1", default-features = false, features = [
+  "macros",
+  "rt-multi-thread",
+] }
+strum_macros = "0.27.1"
+strum = "0.27.1"
