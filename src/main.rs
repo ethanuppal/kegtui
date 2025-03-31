@@ -44,7 +44,7 @@ enum KegMenuItem {
     Config,
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 enum Focus {
     Menu,
     Content,
@@ -57,6 +57,7 @@ enum Modal {
 
 #[derive(Debug, Clone)]
 struct Keg {
+    name: String,
     config_file: PathBuf,
     wineskin_launcher: OsString,
 }
@@ -64,6 +65,11 @@ struct Keg {
 impl Keg {
     fn from_path(path: &Path) -> Self {
         Self {
+            name: path
+                .file_name()
+                .expect("Missing Keg name")
+                .to_string_lossy()
+                .to_string(),
             config_file: path.join("Contents/Info.plist"),
             wineskin_launcher: path
                 .join("Contents/MacOS/wineskinLauncher")
@@ -80,6 +86,7 @@ struct App {
     current_modal: Option<Modal>,
     credits_vertical_scroll: usize,
     kegs_vertical_scroll: usize,
+    keg_selection: ListState,
     current_keg: Option<Keg>,
 }
 
@@ -96,6 +103,7 @@ impl App {
             current_modal: None,
             credits_vertical_scroll: 0,
             kegs_vertical_scroll: 0,
+            keg_selection: ListState::default(),
             current_keg: None,
         }
     }
@@ -119,8 +127,8 @@ impl App {
             if let Ok(list_of_kegs) = list_of_kegs.read() {
                 terminal
                     .draw(|frame| self.draw(frame, list_of_kegs.as_ref()))?;
+                self.handle_events(list_of_kegs.as_ref())?;
             }
-            self.handle_events()?;
             interval.tick().await;
         }
         Ok(())
@@ -278,34 +286,45 @@ impl App {
                 .expect("Invalid item selected")
                 {
                     MainMenuItem::Kegs => {
-                        let kegs_list = list_of_kegs
+                        let keg_items: Vec<ListItem> = list_of_kegs
                             .iter()
-                            .map(|keg| Line::from(format!("{keg:?}")))
-                            .collect::<Vec<_>>();
-                        let kegs_paragraph = Paragraph::new(kegs_list.clone());
+                            .cloned()
+                            .map(|keg| ListItem::new(Span::from(keg.name)))
+                            .collect();
+                        if !keg_items.is_empty()
+                            && self.keg_selection.selected().is_none()
+                        {
+                            self.keg_selection.select(Some(0));
+                        }
 
-                        let scrollbar =
-                            Scrollbar::new(ScrollbarOrientation::VerticalRight)
-                                .begin_symbol(Some("↑"))
-                                .end_symbol(Some("↓"));
-
-                        let mut scrollbar_state =
-                            ScrollbarState::new(kegs_list.len())
-                                .position(self.kegs_vertical_scroll);
-
+                        let keg_title = Paragraph::new("Select a Keg:");
                         frame.render_widget(
-                            kegs_paragraph
-                                .wrap(Wrap { trim: false })
-                                .scroll((self.kegs_vertical_scroll as u16, 0)),
-                            area,
+                            keg_title,
+                            Rect { height: 1, ..area },
                         );
+
+                        let list_area = Rect {
+                            x: area.x,
+                            y: area.y + 1,
+                            width: area.width,
+                            height: area.height.saturating_sub(1),
+                        };
+
+                        let keg_selector_list = List::new(keg_items)
+                            .highlight_style(
+                                Style::default()
+                                    .fg(if self.focus == Focus::Content {
+                                        Color::Yellow
+                                    } else {
+                                        Color::Gray
+                                    })
+                                    .add_modifier(Modifier::BOLD),
+                            )
+                            .highlight_symbol(">> ");
                         frame.render_stateful_widget(
-                            scrollbar,
-                            area.inner(Margin {
-                                vertical: 1,
-                                horizontal: 0,
-                            }),
-                            &mut scrollbar_state,
+                            keg_selector_list,
+                            list_area,
+                            &mut self.keg_selection,
                         );
                     }
                     MainMenuItem::Settings => {}
@@ -348,9 +367,7 @@ impl App {
                             Paragraph::new(credits_list.clone());
 
                         let scrollbar =
-                            Scrollbar::new(ScrollbarOrientation::VerticalRight)
-                                .begin_symbol(Some("↑"))
-                                .end_symbol(Some("↓"));
+                            Scrollbar::new(ScrollbarOrientation::VerticalRight);
 
                         let mut scrollbar_state =
                             ScrollbarState::new(credits_list.len())
@@ -389,13 +406,13 @@ impl App {
         }
     }
 
-    fn handle_events(&mut self) -> Result<()> {
+    fn handle_events(&mut self, list_of_kegs: &[Keg]) -> Result<()> {
         if event::poll(time::Duration::from_millis(5))? {
             match event::read()? {
                 Event::Key(key_event)
                     if key_event.kind == KeyEventKind::Press =>
                 {
-                    self.handle_key_event(key_event)
+                    self.handle_key_event(key_event, list_of_kegs)
                 }
                 _ => {}
             };
@@ -403,9 +420,8 @@ impl App {
         Ok(())
     }
 
-    fn handle_key_event(&mut self, key_event: KeyEvent) {
+    fn handle_key_event(&mut self, key_event: KeyEvent, list_of_kegs: &[Keg]) {
         let menu_length = self.menu_items().len();
-        let current = self.menu_state_ref().selected().unwrap_or(0);
 
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
@@ -427,13 +443,14 @@ impl App {
                 if self.current_modal == Some(Modal::KeybindsHelp) {
                     return;
                 }
-                if self.focus == Focus::Menu {
+                if let Some(state) = self.current_list_state_mut() {
+                    let current = *state.selected().get_or_insert(0);
                     let new_index = if current == 0 {
                         menu_length - 1
                     } else {
                         current - 1
                     };
-                    self.menu_state_mut().select(Some(new_index));
+                    state.select(Some(new_index));
                 } else if self.focus == Focus::Content
                     && self.current_view == View::Main
                     && MainMenuItem::Credits as usize
@@ -450,13 +467,14 @@ impl App {
                 if self.current_modal == Some(Modal::KeybindsHelp) {
                     return;
                 }
-                if self.focus == Focus::Menu {
+                if let Some(state) = self.current_list_state_mut() {
+                    let current = *state.selected().get_or_insert(0);
                     let new_index = if current >= menu_length - 1 {
                         0
                     } else {
                         current + 1
                     };
-                    self.menu_state_mut().select(Some(new_index));
+                    state.select(Some(new_index));
                 } else if self.focus == Focus::Content
                     && self.current_view == View::Main
                     && MainMenuItem::Credits as usize
@@ -501,9 +519,23 @@ impl App {
                                     self.current_view = View::Main;
                                 }
                             }
-                            _ => {}
                         }
                     }
+                } else if self.focus == Focus::Content
+                    && (self.current_view, self.menu_state_ref().selected())
+                        == (View::Main, Some(MainMenuItem::Kegs as usize))
+                {
+                    self.current_view = View::Keg;
+                    self.focus = Focus::Menu;
+                    self.menu_state_mut()
+                        .select(Some(KegMenuItem::Main as usize));
+                    self.current_keg = Some(
+                        list_of_kegs[self
+                            .keg_selection
+                            .selected()
+                            .expect("Should have been set to something")]
+                        .clone(),
+                    )
                 }
             }
             _ => {}
@@ -516,6 +548,32 @@ impl App {
 
     fn menu_state_mut(&mut self) -> &mut ListState {
         &mut self.menu_states[self.current_view as usize]
+    }
+
+    fn current_list_state_ref(&self) -> Option<&ListState> {
+        match (self.current_view, self.focus) {
+            (_, Focus::Menu) => Some(self.menu_state_ref()),
+            (View::Main, Focus::Content)
+                if self.menu_state_ref().selected()
+                    == Some(MainMenuItem::Kegs as usize) =>
+            {
+                Some(&self.keg_selection)
+            }
+            _ => None,
+        }
+    }
+
+    fn current_list_state_mut(&mut self) -> Option<&mut ListState> {
+        match (self.current_view, self.focus) {
+            (_, Focus::Menu) => Some(self.menu_state_mut()),
+            (View::Main, Focus::Content)
+                if self.menu_state_ref().selected()
+                    == Some(MainMenuItem::Kegs as usize) =>
+            {
+                Some(&mut self.keg_selection)
+            }
+            _ => None,
+        }
     }
 
     fn exit(&mut self) {
