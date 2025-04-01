@@ -23,6 +23,12 @@ use std::{
     thread, time,
 };
 
+use crate::{
+    app::App,
+    keg_plist::KegPlist,
+    view::{MenuItem, MenuItemAction, NavContext},
+};
+use app::spawn_worker;
 use checks::is_kegworks_installed;
 use color_eyre::{eyre::eyre, Result};
 use crossterm::{
@@ -32,12 +38,6 @@ use crossterm::{
         LeaveAlternateScreen,
     },
     ExecutableCommand,
-};
-use kegtui::{
-    app::App,
-    keg_plist::KegPlist,
-    view::{MenuItem, MenuItemAction, NavContext},
-    views,
 };
 use ratatui::{
     layout::{Constraint, Direction, Layout, Margin, Rect},
@@ -53,87 +53,54 @@ use ratatui::{
 use strum::{EnumCount, VariantNames};
 use strum_macros::{AsRefStr, EnumCount, FromRepr, VariantNames};
 
-#[derive(PartialEq, Eq, Clone, Copy, EnumCount)]
-#[repr(usize)]
-enum View {
-    SetupWizard,
-    Main,
-    Keg,
-}
-
-#[derive(VariantNames, AsRefStr, FromRepr)]
-enum SetupWizardMenuItem {
-    #[strum(to_string = "Setup Wizard")]
-    SetupWizard,
-}
-
-#[derive(VariantNames, AsRefStr, FromRepr)]
-enum MainMenuItem {
-    Kegs,
-    Settings,
-    Credits,
-}
-
-#[derive(VariantNames, AsRefStr, FromRepr)]
-enum KegMenuItem {
-    Back,
-    Main,
-    Winetricks,
-    #[strum(to_string = "Open C Drive")]
-    CDrive,
-    Config,
-}
-
-#[derive(PartialEq, Eq, Clone, Copy)]
-enum Focus {
-    Menu,
-    Content,
-}
-
-#[derive(PartialEq, Eq)]
-enum Modal {
-    KeybindsHelp,
-}
-
-#[derive(Debug, Clone)]
-struct Keg {
-    name: String,
-    config_file: PathBuf,
-    wineskin_launcher: OsString,
-    c_drive: PathBuf,
-}
-
-struct CurrentKeg {
-    name: String,
-    wineskin_launcher: OsString,
-    c_drive: PathBuf,
-    plist: KegPlist,
-    config_file: PathBuf,
-}
-
-impl Keg {
-    fn from_path(path: &Path) -> Self {
-        Self {
-            name: path
-                .file_name()
-                .expect("Missing Keg name")
-                .to_string_lossy()
-                .to_string(),
-            config_file: path.join("Contents/Info.plist"),
-            c_drive: path.join("Contents/drive_c"),
-            wineskin_launcher: path
-                .join("Contents/MacOS/wineskinLauncher")
-                .into_os_string(),
-        }
-    }
-}
-
-#[derive(Default)]
-struct AsyncState {
-    kegs: Vec<Keg>,
-    brew_installed: Option<bool>,
-    kegworks_installed: Option<bool>,
-}
+pub mod app;
+pub mod checks;
+pub mod keg;
+pub mod keg_config;
+pub mod keg_plist;
+pub mod view;
+pub mod views;
+//#[derive(PartialEq, Eq, Clone, Copy, EnumCount)]
+//#[repr(usize)]
+//enum View {
+//    SetupWizard,
+//    Main,
+//    Keg,
+//}
+//
+//#[derive(VariantNames, AsRefStr, FromRepr)]
+//enum SetupWizardMenuItem {
+//    #[strum(to_string = "Setup Wizard")]
+//    SetupWizard,
+//}
+//
+//#[derive(VariantNames, AsRefStr, FromRepr)]
+//enum MainMenuItem {
+//    Kegs,
+//    Settings,
+//    Credits,
+//}
+//
+//#[derive(VariantNames, AsRefStr, FromRepr)]
+//enum KegMenuItem {
+//    Back,
+//    Main,
+//    Winetricks,
+//    #[strum(to_string = "Open C Drive")]
+//    CDrive,
+//    Config,
+//}
+//
+//#[derive(PartialEq, Eq, Clone, Copy)]
+//enum Focus {
+//    Menu,
+//    Content,
+//}
+//
+//#[derive(PartialEq, Eq)]
+//enum Modal {
+//    KeybindsHelp,
+//}
 
 fn copy_to_clipboard(text: &str) -> Result<()> {
     let mut child = Command::new("pbcopy").stdin(Stdio::piped()).spawn()?;
@@ -898,58 +865,7 @@ fn copy_to_clipboard(text: &str) -> Result<()> {
 //    }
 //}
 
-mod checks {
-    use super::*;
-
-    pub fn is_brew_installed() -> bool {
-        Command::new("which")
-            .arg("brew")
-            .output()
-            .map(|output| output.status.success())
-            .unwrap_or(false)
-    }
-
-    pub fn is_kegworks_installed() -> bool {
-        Path::new("/Applications/Kegworks Winery.app").exists()
-    }
-}
-
 fn main() -> Result<()> {
-    let app_state = Arc::new(RwLock::new(AsyncState::default()));
-
-    let (quit_tx, mut quit_rx) = sync::mpsc::channel();
-
-    let async_state = app_state.clone();
-    thread::spawn(move || loop {
-        if quit_rx.try_recv().is_ok() {
-            break;
-        }
-        let mut kegs = vec![];
-        for enclosing_location in [
-            "/Applications",
-            "~/Applications/",
-            "~/Applications/Kegworks/",
-        ] {
-            if let Ok(read_dir) = fs::read_dir(enclosing_location) {
-                for entry in read_dir.flatten() {
-                    if entry.path().join("Contents/KegworksConfig.app").exists()
-                    {
-                        kegs.push(Keg::from_path(&entry.path()));
-                    }
-                }
-            }
-        }
-
-        let brew_installed = checks::is_brew_installed();
-        let kegworks_installed = checks::is_kegworks_installed();
-
-        if let Ok(mut lock) = async_state.try_write() {
-            lock.kegs = kegs;
-            lock.brew_installed = Some(brew_installed);
-            lock.kegworks_installed = Some(kegworks_installed);
-        }
-    });
-
     let mut context = NavContext::<App>::default();
 
     let credits_view = context.view(&views::credits::CreditsView);
@@ -964,6 +880,8 @@ fn main() -> Result<()> {
         MenuItemAction::LoadView(credits_view),
     )]);
 
+    let (async_state, _terminate_worker_guard) = spawn_worker();
+
     color_eyre::install()?;
     let mut terminal = ratatui::init();
     let app_result = App::default().run(
@@ -974,8 +892,8 @@ fn main() -> Result<()> {
             setup_wizard_nav
         },
         &mut terminal,
+        async_state,
     );
-    quit_tx.send(()).or(Err(eyre!("bug: Could not send quit message to worker thread, so you have to use CTRL-C unfortunately")))?;
     ratatui::restore();
     app_result
 }
