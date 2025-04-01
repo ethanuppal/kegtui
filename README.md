@@ -2,6 +2,18 @@
 
 Terminal interface for [Kegworks][kegworks].
 
+## Install
+
+```
+git clone https://github.com/ethanuppal/kegtui
+cd kegtui
+cargo install --path .
+```
+
+## Usage
+
+Press `?` anywhere to view keybinds.
+
 ## Support [GCenx](https://github.com/Gcenx).
 
 Wine on macOS is effecivtively made possible by him.
