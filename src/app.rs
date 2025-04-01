@@ -58,14 +58,14 @@ impl<'a> App<'a> {
         context.push_nav(initial);
 
         let mut interval = Instant::now();
-        let duration = Duration::from_millis(100);
+        let duration = Duration::from_millis(20);
 
         while !self.exit {
             interval += duration;
             let now = Instant::now();
 
             if now < interval {
-                //thread::sleep(interval - now);
+                thread::sleep(interval - now);
             }
 
             if let Ok(state) = state.read() {
