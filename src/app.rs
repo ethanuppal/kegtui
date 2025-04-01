@@ -44,10 +44,13 @@ pub struct App<'a> {
     current_view: Option<ViewID<'a>>,
     clickables_state: usize,
     // ENDTODO
-    pub(crate) vertical_scroll: usize,
 }
 
 impl<'a> App<'a> {
+    pub fn interaction_state(&self) -> usize {
+        self.clickables_state
+    }
+
     pub fn run(
         &mut self,
         context: &mut NavContext<'a>,
@@ -78,7 +81,7 @@ impl<'a> App<'a> {
 
     fn draw(
         &mut self,
-        context: &mut NavContext,
+        context: &mut NavContext<'a>,
         frame: &mut Frame,
         state: &AsyncState,
     ) {
@@ -115,15 +118,10 @@ impl<'a> App<'a> {
             let menu = context.get_nav(current_nav).menu();
             self.draw_menu(frame, section_rects[0], menu);
             self.draw_vertical_separator(frame, section_rects[1]);
-            //self.draw_content(frame, section_rects[2], state);
+            self.draw_content(context, state, frame, section_rects[2]);
         }
     }
-    fn draw_menu(
-        &mut self,
-        frame: &mut Frame<'_>,
-        area: Rect,
-        menu: &[MenuItem],
-    ) {
+    fn draw_menu(&mut self, frame: &mut Frame, area: Rect, menu: &[MenuItem]) {
         let menu_items: Vec<ListItem> = menu
             .iter()
             .map(|item| ListItem::new(Span::from(item.name())))
@@ -146,11 +144,25 @@ impl<'a> App<'a> {
         );
     }
 
-    fn draw_vertical_separator(&mut self, frame: &mut Frame<'_>, area: Rect) {
+    fn draw_vertical_separator(&mut self, frame: &mut Frame, area: Rect) {
         let buffer = frame.buffer_mut();
         for y in area.top()..area.bottom() {
             buffer[(area.x, y)].set_symbol(VERTICAL);
         }
+    }
+
+    fn draw_content(
+        &mut self,
+        context: &NavContext<'a>,
+        state: &AsyncState,
+        frame: &mut Frame,
+        area: Rect,
+    ) -> Result<()> {
+        if let Some(view_id) = self.current_view {
+            let view = context.get_view(view_id);
+            view.draw_content(self, state, frame, area)?;
+        }
+        Ok(())
     }
 
     fn handle_events(
@@ -183,17 +195,6 @@ impl<'a> App<'a> {
         let menu = context.get_nav(current_nav).menu();
         let current_menu_item = &menu[self.menu_state];
 
-        let select_length = match self.focus {
-            Focus::Menu => menu.len(),
-            Focus::Content => context
-                .get_view(
-                    self.current_view
-                        .expect("View focused but app has no view"),
-                )
-                .clickables(self)
-                .len(),
-        };
-
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
             KeyCode::Esc => {
@@ -205,19 +206,44 @@ impl<'a> App<'a> {
                     self.menu_state = self.menu_state.saturating_sub(1);
                 }
                 Focus::Content => {
-                    self.clickables_state =
-                        self.clickables_state.saturating_sub(1);
+                    let current_view = context
+                        .get_view(self.current_view.expect(
+                            "Focused view but app has no current view",
+                        ));
+                    match current_view.interactivity(self, state) {
+                        ViewInteractivity::None => {}
+                        ViewInteractivity::Scrollable => {
+                            self.clickables_state =
+                                self.clickables_state.saturating_sub(3);
+                        }
+                        ViewInteractivity::Clickables(count) => {
+                            self.clickables_state =
+                                self.clickables_state.saturating_sub(1);
+                        }
+                    }
                 }
             },
             KeyCode::Down | KeyCode::Char('j') => match self.focus {
                 Focus::Menu => {
-                    if self.menu_state + 1 < select_length {
+                    if self.menu_state + 1 < menu.len() {
                         self.menu_state += 1;
                     }
                 }
                 Focus::Content => {
-                    if self.clickables_state + 1 < select_length {
-                        self.clickables_state += 1;
+                    let current_view = context
+                        .get_view(self.current_view.expect(
+                            "Focused view but app has no current view",
+                        ));
+                    match current_view.interactivity(self, state) {
+                        ViewInteractivity::None => {}
+                        ViewInteractivity::Scrollable => {
+                            self.clickables_state += 3;
+                        }
+                        ViewInteractivity::Clickables(count) => {
+                            if self.clickables_state + 1 < count {
+                                self.clickables_state += 1;
+                            }
+                        }
                     }
                 }
             },
@@ -242,7 +268,7 @@ impl<'a> App<'a> {
                             .get_view(self.current_view.expect(
                                 "Focused view but app has no current view",
                             ))
-                            .click(self, self.clickables_state)
+                            .click(self, state, self.clickables_state)
                     {
                         self.execute_nav_action(context, nav_action);
                     }

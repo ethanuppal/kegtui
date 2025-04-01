@@ -17,7 +17,7 @@ use std::{borrow::Cow, collections::HashMap};
 use color_eyre::eyre::Result;
 use ratatui::{layout::Rect, Frame};
 
-use crate::app::App;
+use crate::app::{App, AsyncState};
 
 pub mod prelude {
     pub use super::*;
@@ -102,6 +102,13 @@ impl<'a> Nav<'a> {
     }
 }
 
+#[derive(PartialEq, Eq)]
+pub enum ViewInteractivity {
+    None,
+    Scrollable,
+    Clickables(usize),
+}
+
 pub trait View {
     ///// The menu items this view exposes.
     //fn menu<'a>(&self, state: &State) -> Vec<MenuItem<'a>>;
@@ -109,27 +116,37 @@ pub trait View {
     /// Draw the views content.
     fn draw_content(
         &self,
-        state: &App,
+        app: &App,
+        state: &AsyncState,
         frame: &mut Frame<'_>,
         area: Rect,
     ) -> Result<()> {
-        let _ = (state, frame, area);
+        let _ = (app, state, frame, area);
         Ok(())
     }
 
     /// Clickable objects currently drawn.
-    fn clickables(&self, state: &App) -> Vec<usize> {
-        let _ = state;
-        vec![]
+    fn interactivity(
+        &self,
+        app: &App,
+        state: &AsyncState,
+    ) -> ViewInteractivity {
+        let _ = (app, state);
+        ViewInteractivity::None
     }
 
-    /// Notifies that a clickable has been selected.
-    fn select(&self, state: &mut App, index: usize) {
-        let _ = (state, index);
+    /// Notifies that an `index` has been selected/scrolled to.
+    fn interact(&self, app: &mut App, state: &AsyncState, index: usize) {
+        let _ = (app, state, index);
     }
 
-    fn click(&self, state: &mut App, index: usize) -> Option<NavAction> {
-        let _ = (state, index);
+    fn click(
+        &self,
+        app: &mut App,
+        state: &AsyncState,
+        index: usize,
+    ) -> Option<NavAction> {
+        let _ = (app, state, index);
         None
     }
 }

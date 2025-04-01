@@ -12,7 +12,10 @@
 // You should have received a copy of the GNU General Public License along with
 // this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{app::App, view::prelude::*};
+use crate::{
+    app::{App, AsyncState},
+    view::prelude::*,
+};
 
 pub struct CreditsView;
 
@@ -20,6 +23,7 @@ impl View for CreditsView {
     fn draw_content(
         &self,
         app: &App,
+        _state: &AsyncState,
         frame: &mut ratatui::Frame<'_>,
         area: ratatui::prelude::Rect,
     ) -> Result<()> {
@@ -60,10 +64,10 @@ impl View for CreditsView {
         let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight);
 
         let mut scrollbar_state = ScrollbarState::new(credits_list.len())
-            .position(app.vertical_scroll);
+            .position(app.interaction_state());
 
         frame.render_widget(
-            credits_paragraph.scroll((app.vertical_scroll as u16, 0)),
+            credits_paragraph.scroll((app.interaction_state() as u16, 0)),
             area,
         );
         frame.render_stateful_widget(
@@ -76,5 +80,13 @@ impl View for CreditsView {
         );
 
         Ok(())
+    }
+
+    fn interactivity(
+        &self,
+        _app: &App,
+        _state: &AsyncState,
+    ) -> ViewInteractivity {
+        ViewInteractivity::Scrollable
     }
 }
