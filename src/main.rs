@@ -102,6 +102,7 @@ struct CurrentKeg {
     wineskin_launcher: OsString,
     c_drive: PathBuf,
     plist: KegPlist,
+    config_file: PathBuf,
 }
 
 impl Keg {
@@ -776,6 +777,11 @@ impl App {
                                         current_keg
                                             .plist
                                             .update_from_config(&new_config);
+                                        //fs::write(current_keg.config_file, plist)
+                                        plist::to_file_xml(
+                                            &current_keg.config_file,
+                                            &current_keg.plist,
+                                        )?;
                                     }
                                 } else if item == KegMenuItem::CDrive.as_ref() {
                                     if let Ok(explorer) = env::var("EXPLORER") {
@@ -827,6 +833,7 @@ impl App {
                         wineskin_launcher: keg.wineskin_launcher.clone(),
                         c_drive: keg.c_drive.clone(),
                         plist: plist::from_file(&keg.config_file)?,
+                        config_file: keg.config_file.clone(),
                     })
                 } else if self.focus == Focus::Content
                     && self.current_view == View::SetupWizard
