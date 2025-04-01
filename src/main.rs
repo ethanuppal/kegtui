@@ -770,6 +770,7 @@ impl App {
                                             )?;
                                         let new_toml_config = Self::run_editor(
                                             terminal,
+                                            "/tmp/kegtui.toml",
                                             toml_config,
                                         )?;
                                         let new_config =
@@ -873,19 +874,6 @@ impl App {
         &mut self.menu_states[self.current_view as usize]
     }
 
-    //fn current_list_state_ref(&self) -> Option<&ListState> {
-    //    match (self.current_view, self.focus) {
-    //        (_, Focus::Menu) => Some(self.menu_state_ref()),
-    //        (View::Main, Focus::Content)
-    //            if self.menu_state_ref().selected()
-    //                == Some(MainMenuItem::Kegs as usize) =>
-    //        {
-    //            Some(&self.keg_selection)
-    //        }
-    //        _ => None,
-    //    }
-    //}
-
     fn current_list_state_mut(&mut self) -> Option<&mut ListState> {
         match (self.current_view, self.focus) {
             (_, Focus::Menu) => Some(self.menu_state_mut()),
@@ -928,17 +916,18 @@ impl App {
 
     fn run_editor(
         terminal: &mut DefaultTerminal,
+        file: &str,
         initial: impl Into<String>,
     ) -> Result<String> {
-        fs::write("/tmp/kegtui.toml", initial.into())?;
+        fs::write(file, initial.into())?;
         io::stdout().execute(LeaveAlternateScreen)?;
         disable_raw_mode()?;
         let editor = env::var("EDITOR").unwrap_or("vim".into());
-        Command::new(editor).arg("/tmp/kegtui.toml").status()?;
+        Command::new(editor).arg(file).status()?;
         io::stdout().execute(EnterAlternateScreen)?;
         enable_raw_mode()?;
         terminal.clear()?;
-        Ok(fs::read_to_string("/tmp/kegtui.toml")?)
+        Ok(fs::read_to_string(file)?)
     }
 
     fn run_program(
@@ -1005,11 +994,6 @@ async fn main() -> Result<()> {
     eprintln!("Checking to see if Kegworks is installed...");
     let kegworks_installed =
         Path::new("/Applications/Kegworks Winery.app").exists();
-    //Command::new("brew")
-    //    .args(["list", "--cask", "kegworks"])
-    //    .output()
-    //    .map(|output| output.status.success())
-    //    .unwrap_or(false);
 
     color_eyre::install()?;
     let mut terminal = ratatui::init();
