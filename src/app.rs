@@ -188,7 +188,7 @@ impl<'a> App<'a> {
                     self.current_view
                         .expect("View focused but app has no view"),
                 )
-                .clickables(&self)
+                .clickables(self)
                 .len(),
         };
 
@@ -222,8 +222,8 @@ impl<'a> App<'a> {
             }
             KeyCode::Right | KeyCode::Char('l') => {
                 if self.focus == Focus::Menu {
-                    let action = current_menu_item.action().clone();
-                    self.execute_menu_action(context, action);
+                    let menu_action = current_menu_item.action().clone();
+                    self.execute_menu_action(context, menu_action);
                 }
             }
 

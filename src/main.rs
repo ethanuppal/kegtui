@@ -13,45 +13,17 @@
 // this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
-    env,
-    ffi::OsString,
-    fs,
-    io::{self, Write},
-    path::{Path, PathBuf},
+    io::{Write},
     process::{Command, Stdio},
-    sync::{self, Arc, RwLock},
-    thread, time,
 };
 
 use crate::{
     app::App,
-    keg_plist::KegPlist,
     view::{MenuItem, MenuItemAction, NavContext},
 };
 use app::spawn_worker;
 use checks::is_kegworks_installed;
 use color_eyre::{eyre::eyre, Result};
-use crossterm::{
-    event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
-    terminal::{
-        disable_raw_mode, enable_raw_mode, EnterAlternateScreen,
-        LeaveAlternateScreen,
-    },
-    ExecutableCommand,
-};
-use ratatui::{
-    layout::{Constraint, Direction, Layout, Margin, Rect},
-    style::{Color, Modifier, Style, Stylize},
-    symbols::line::VERTICAL,
-    text::{Line, Span},
-    widgets::{
-        Block, Borders, Clear, List, ListItem, ListState, Padding, Paragraph,
-        Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table,
-    },
-    DefaultTerminal, Frame,
-};
-use strum::{EnumCount, VariantNames};
-use strum_macros::{AsRefStr, EnumCount, FromRepr, VariantNames};
 
 pub mod app;
 pub mod checks;

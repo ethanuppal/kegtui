@@ -15,7 +15,7 @@
 use std::{borrow::Cow, collections::HashMap};
 
 use color_eyre::eyre::Result;
-use ratatui::{layout::Rect, DefaultTerminal, Frame};
+use ratatui::{layout::Rect, Frame};
 
 use crate::app::App;
 
