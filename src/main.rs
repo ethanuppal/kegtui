@@ -966,7 +966,8 @@ fn main() -> Result<()> {
 
     color_eyre::install()?;
     let mut terminal = ratatui::init();
-    let result = context.run_ratatui(
+    let app_result = App::default().run(
+        &mut context,
         if is_kegworks_installed() {
             main_nav
         } else {
@@ -976,5 +977,5 @@ fn main() -> Result<()> {
     );
     quit_tx.send(()).or(Err(eyre!("bug: Could not send quit message to worker thread, so you have to use CTRL-C unfortunately")))?;
     ratatui::restore();
-    result
+    app_result
 }

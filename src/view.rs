@@ -128,12 +128,4 @@ impl<'a, State> NavContext<'a, State> {
         });
         NavID::Index(self.navs.len() - 1)
     }
-
-    pub fn run_ratatui(
-        &mut self,
-        initial: NavID<'a>,
-        terminal: &mut DefaultTerminal,
-    ) -> Result<()> {
-        Ok(())
-    }
 }

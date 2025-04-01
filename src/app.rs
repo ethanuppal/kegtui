@@ -12,7 +12,22 @@
 // You should have received a copy of the GNU General Public License along with
 // this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use ratatui::DefaultTerminal;
+
+use crate::view::prelude::*;
+
 #[derive(Default)]
 pub struct App {
     pub(crate) vertical_scroll: usize,
+}
+
+impl App {
+    pub fn run<'a>(
+        &mut self,
+        context: &mut NavContext<'a, App>,
+        initial: NavID<'a>,
+        terminal: &mut DefaultTerminal,
+    ) -> Result<()> {
+        Ok(())
+    }
 }
