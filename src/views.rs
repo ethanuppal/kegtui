@@ -13,6 +13,5 @@
 // this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pub mod credits;
-pub mod keg_main;
 pub mod kegs;
 pub mod setup_wizard;

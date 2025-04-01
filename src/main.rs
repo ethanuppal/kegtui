@@ -12,15 +12,16 @@
 // You should have received a copy of the GNU General Public License along with
 // this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::{env, fs, io, process::Command, thread, time::Duration};
+
 use crate::{
     app::App,
     view::{MenuItem, MenuItemAction, NavContext},
 };
-use app::spawn_worker;
+use app::{spawn_worker, AsyncState};
 use checks::is_kegworks_installed;
 use color_eyre::Result;
 use view::NavAction;
-use views::keg_main::{edit_config, open_c_drive};
 
 pub mod app;
 pub mod checks;
@@ -29,6 +30,64 @@ pub mod keg_config;
 pub mod keg_plist;
 pub mod view;
 pub mod views;
+
+pub fn open_c_drive(app: &mut App, _state: &AsyncState) -> Result<()> {
+    let Some(current_keg) = &app.current_keg else {
+        return Ok(());
+    };
+    if let Ok(explorer) = env::var("EXPLORER") {
+        Command::new(explorer)
+            .arg(current_keg.c_drive.to_string_lossy().to_string())
+            .status()?;
+    } else {
+        Command::new("open")
+            .arg(current_keg.c_drive.to_string_lossy().to_string())
+            .status()?;
+    }
+    Ok(())
+}
+
+pub fn edit_config(app: &mut App, _state: &AsyncState) -> Result<()> {
+    if let Some(current_keg) = &mut app.current_keg {
+        let toml_config =
+            toml::to_string_pretty(&current_keg.plist.extract_config())?;
+        let file = "/tmp/kegtui.toml";
+        fs::write(file, toml_config)?;
+        let editor = env::var("EDITOR").unwrap_or("vim".into());
+        Command::new(editor).arg(file).status()?;
+        let new_toml_config = toml::from_str(&fs::read_to_string(file)?)?;
+        current_keg.plist.update_from_config(&new_toml_config);
+        plist::to_file_xml(&current_keg.config_file, &current_keg.plist)?;
+    }
+    Ok(())
+}
+
+pub fn launch_keg(app: &mut App, _state: &AsyncState) -> Result<()> {
+    if let Some(current_keg) = &app.current_keg {
+        eprintln!("┌──────────────────────────────────┐");
+        eprintln!("│ Launching this keg               │");
+        eprintln!("│ Press enter to return to the TUI │");
+        eprintln!("└──────────────────────────────────┘");
+        let wrapper = current_keg.wineskin_launcher.clone();
+        thread::spawn(move || {
+            let _ = Command::new(wrapper).status();
+        });
+        io::stdin().read_line(&mut String::new())?;
+    }
+    Ok(())
+}
+
+pub fn kill_wineserver(app: &mut App, _state: &AsyncState) -> Result<()> {
+    if let Some(current_keg) = &app.current_keg {
+        eprintln!("┌─────────────────────────────────────────┐");
+        eprintln!("│ Killing processes spawned from this keg │");
+        eprintln!("└─────────────────────────────────────────┘");
+        Command::new(&current_keg.wineskin_launcher)
+            .arg("WSS-wineserverkill")
+            .status()?;
+    }
+    Ok(())
+}
 
 fn main() -> Result<()> {
     let mut context = NavContext::default();
@@ -55,13 +114,11 @@ fn main() -> Result<()> {
         ],
     );
 
-    let keg_main_view = context.view("keg_main", &views::keg_main::KegMainView);
-
     let keg_nav = context.nav(
         "keg",
         [
             MenuItem::new("Back", MenuItemAction::NavAction(NavAction::Pop)),
-            MenuItem::new("Main", MenuItemAction::LoadView(keg_main_view))
+            MenuItem::new("Launch", MenuItemAction::External(launch_keg))
                 .default(),
             //MenuItem::new("Winetricks", todo!()),
             MenuItem::new(
@@ -69,6 +126,11 @@ fn main() -> Result<()> {
                 MenuItemAction::External(open_c_drive),
             ),
             MenuItem::new("Edit Config", MenuItemAction::External(edit_config)),
+            MenuItem::new(
+                "Kill Processes",
+                MenuItemAction::External(kill_wineserver),
+            )
+            .default(),
         ],
     );
 

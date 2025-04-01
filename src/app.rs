@@ -80,7 +80,7 @@ fn make_keybinds_help_table() -> (Table<'static>, u16, u16) {
             (table, (lhs_width + 1 + rhs_width) as u16, height as u16)
         }};
     }
-    make!(
+    make![
         (["<?>"], "Toggle this modal"),
         (["<Esc>"], "Exit modal (in modal), focus menu (in content)"),
         (["<Left>", "<H>"], "Focus menu"),
@@ -91,8 +91,17 @@ fn make_keybinds_help_table() -> (Table<'static>, u16, u16) {
             ["<Enter>"],
             "Focus content (in menu), select button (in content)"
         ),
+        (["<Z>"], "Suspend app"),
         (["<Q>"], "Exit app")
-    )
+    ]
+}
+
+pub fn inspect_terminal(_app: &mut App, _state: &AsyncState) -> Result<()> {
+    eprintln!("┌──────────────────────────────────┐");
+    eprintln!("│ Press enter to return to the TUI │");
+    eprintln!("└──────────────────────────────────┘");
+    io::stdin().read_line(&mut String::new())?;
+    Ok(())
 }
 
 #[derive(Default, PartialEq, Eq)]
@@ -400,6 +409,12 @@ impl<'a> App<'a> {
                     }
                 }
             },
+            KeyCode::Char('z') => self.execute_menu_action(
+                context,
+                state,
+                terminal,
+                MenuItemAction::External(inspect_terminal),
+            )?,
             _ => {}
         }
         Ok(())
