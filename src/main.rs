@@ -32,7 +32,7 @@ use crossterm::{
         enable_raw_mode,
     },
 };
-use kegworks_plist::KegworksPlist;
+use kegtui::keg_plist::KegPlist;
 use ratatui::{
     DefaultTerminal, Frame,
     layout::{Constraint, Direction, Layout, Margin, Rect},
@@ -46,8 +46,6 @@ use ratatui::{
 };
 use strum::{EnumCount, VariantNames};
 use strum_macros::{AsRefStr, EnumCount, FromRepr, VariantNames};
-
-mod kegworks_plist;
 
 #[derive(PartialEq, Eq, Clone, Copy, EnumCount)]
 #[repr(usize)]
@@ -103,7 +101,7 @@ struct CurrentKeg {
     name: String,
     wineskin_launcher: OsString,
     c_drive: PathBuf,
-    plist: KegworksPlist,
+    plist: KegPlist,
 }
 
 impl Keg {
@@ -780,9 +778,7 @@ impl App {
                                             .update_from_config(&new_config);
                                     }
                                 } else if item == KegMenuItem::CDrive.as_ref() {
-                                    if let Some(explorer) =
-                                        env::var("EXPLORER").ok()
-                                    {
+                                    if let Ok(explorer) = env::var("EXPLORER") {
                                         Self::run_program(
                                             terminal,
                                             Command::new(explorer).arg(
