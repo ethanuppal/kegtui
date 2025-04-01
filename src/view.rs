@@ -114,18 +114,59 @@ pub struct NavContext<'a, State> {
 }
 
 impl<'a, State> NavContext<'a, State> {
-    pub fn view<V: View<State> + 'a>(&mut self, view: &'a V) -> ViewID<'a> {
+    pub fn view<V: View<State> + 'a>(
+        &mut self,
+        name: &'a str,
+        view: &'a V,
+    ) -> ViewID<'a> {
         self.views.push(view);
+        self.named_view_ids.insert(name, self.views.len() - 1);
         ViewID::Index(self.views.len() - 1)
     }
 
     pub fn nav(
         &mut self,
+        name: &'a str,
         menu: impl IntoIterator<Item = MenuItem<'a>>,
     ) -> NavID<'a> {
         self.navs.push(Nav {
             menu: menu.into_iter().collect(),
         });
+        self.named_nav_ids.insert(name, self.navs.len() - 1);
         NavID::Index(self.navs.len() - 1)
+    }
+
+    pub fn push_nav(&mut self, nav: NavID<'a>) {
+        self.stack.push(nav);
+    }
+
+    pub fn top_nav(&self) -> Option<NavID<'a>> {
+        self.stack.last().copied()
+    }
+
+    pub fn get_view_ref(&self, id: ViewID<'a>) -> &'a dyn View<State> {
+        self.views[self.get_view_index(id)]
+    }
+
+    pub fn get_nav_ref(&self, id: NavID<'a>) -> &Nav {
+        &self.navs[self.get_nav_index(id)]
+    }
+
+    fn get_view_index(&self, id: ViewID<'a>) -> usize {
+        match id {
+            ViewID::Index(index) => index,
+            ViewID::Named(name) => {
+                self.named_view_ids.get(name).copied().unwrap()
+            }
+        }
+    }
+
+    fn get_nav_index(&self, id: NavID<'a>) -> usize {
+        match id {
+            NavID::Index(index) => index,
+            NavID::Named(name) => {
+                self.named_nav_ids.get(name).copied().unwrap()
+            }
+        }
     }
 }
