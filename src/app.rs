@@ -21,12 +21,21 @@ use std::{
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
-    widgets::{Block, Borders, List, ListItem, ListState},
+    widgets::{Block, Borders, Clear, List, ListItem, ListState},
     DefaultTerminal,
 };
 use symbols::line::VERTICAL;
 
-use crate::{checks, keg::Keg, view::prelude::*};
+use crate::{
+    checks,
+    keg::{CurrentKeg, Keg},
+    view::prelude::*,
+};
+
+pub const SELECTED_FOCUSED_STYLE: Style =
+    Style::new().fg(Color::Yellow).add_modifier(Modifier::BOLD);
+pub const SELECTED_UNFOCUSED_STYLE: Style =
+    Style::new().fg(Color::White).add_modifier(Modifier::BOLD);
 
 #[derive(Default, PartialEq, Eq)]
 enum Focus {
@@ -44,6 +53,7 @@ pub struct App<'a> {
     current_view: Option<ViewID<'a>>,
     clickables_state: usize,
     // ENDTODO
+    pub current_keg: Option<CurrentKeg>,
 }
 
 impl<'a> App<'a> {
@@ -72,7 +82,8 @@ impl<'a> App<'a> {
             }
 
             if let Ok(state) = state.read() {
-                terminal.draw(|frame| self.draw(context, frame, &state))?;
+                terminal
+                    .draw(|frame| self.draw(context, frame, &state).unwrap())?;
                 self.handle_events(context, &state, terminal)?;
             }
         }
@@ -84,7 +95,7 @@ impl<'a> App<'a> {
         context: &mut NavContext<'a>,
         frame: &mut Frame,
         state: &AsyncState,
-    ) {
+    ) -> Result<()> {
         let area = frame.area();
 
         let main_block = Block::default()
@@ -118,8 +129,12 @@ impl<'a> App<'a> {
             let menu = context.get_nav(current_nav).menu();
             self.draw_menu(frame, section_rects[0], menu);
             self.draw_vertical_separator(frame, section_rects[1]);
-            self.draw_content(context, state, frame, section_rects[2]);
+            self.draw_content(context, state, frame, section_rects[2])?;
+        } else {
+            Clear.render(section_rects[2], frame.buffer_mut());
         }
+
+        Ok(())
     }
     fn draw_menu(&mut self, frame: &mut Frame, area: Rect, menu: &[MenuItem]) {
         let menu_items: Vec<ListItem> = menu
@@ -127,15 +142,11 @@ impl<'a> App<'a> {
             .map(|item| ListItem::new(Span::from(item.name())))
             .collect();
         let menu = List::new(menu_items)
-            .highlight_style(
-                Style::default()
-                    .fg(if self.focus == Focus::Menu {
-                        Color::Yellow
-                    } else {
-                        Color::Gray
-                    })
-                    .add_modifier(Modifier::BOLD),
-            )
+            .highlight_style(if self.focus == Focus::Menu {
+                SELECTED_FOCUSED_STYLE
+            } else {
+                SELECTED_UNFOCUSED_STYLE
+            })
             .highlight_symbol(">> ");
         frame.render_stateful_widget(
             menu,
@@ -160,7 +171,13 @@ impl<'a> App<'a> {
     ) -> Result<()> {
         if let Some(view_id) = self.current_view {
             let view = context.get_view(view_id);
-            view.draw_content(self, state, frame, area)?;
+            view.draw_content(
+                self,
+                state,
+                frame,
+                area,
+                self.focus == Focus::Content,
+            )?;
         }
         Ok(())
     }
@@ -210,7 +227,7 @@ impl<'a> App<'a> {
                         .get_view(self.current_view.expect(
                             "Focused view but app has no current view",
                         ));
-                    match current_view.interactivity(self, state) {
+                    match current_view.interactivity(self, state)? {
                         ViewInteractivity::None => {}
                         ViewInteractivity::Scrollable => {
                             self.clickables_state =
@@ -234,7 +251,7 @@ impl<'a> App<'a> {
                         .get_view(self.current_view.expect(
                             "Focused view but app has no current view",
                         ));
-                    match current_view.interactivity(self, state) {
+                    match current_view.interactivity(self, state)? {
                         ViewInteractivity::None => {}
                         ViewInteractivity::Scrollable => {
                             self.clickables_state += 3;
@@ -268,7 +285,7 @@ impl<'a> App<'a> {
                             .get_view(self.current_view.expect(
                                 "Focused view but app has no current view",
                             ))
-                            .click(self, state, self.clickables_state)
+                            .click(self, state, self.clickables_state)?
                     {
                         self.execute_nav_action(context, nav_action);
                     }
@@ -303,11 +320,13 @@ impl<'a> App<'a> {
             NavAction::Pop => context.pop_nav(),
             NavAction::Push(nav_id) => {
                 context.push_nav(nav_id);
-                self.menu_state = context
-                    .get_nav(context.top_nav().unwrap())
-                    .default_item_index();
             }
         }
+        self.focus = Focus::Menu;
+        self.current_view = None;
+        self.menu_state = context
+            .get_nav(context.top_nav().unwrap())
+            .default_item_index();
     }
 
     fn load_view(&mut self, view_id: ViewID<'a>) {
@@ -323,9 +342,9 @@ impl<'a> App<'a> {
 
 #[derive(Default)]
 pub struct AsyncState {
-    kegs: Vec<Keg>,
-    brew_installed: Option<bool>,
-    kegworks_installed: Option<bool>,
+    pub kegs: Vec<Keg>,
+    pub brew_installed: Option<bool>,
+    pub kegworks_installed: Option<bool>,
 }
 
 pub struct TerminateWorkerGuard(sync::mpsc::Sender<()>);

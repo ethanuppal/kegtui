@@ -12,7 +12,8 @@
 // You should have received a copy of the GNU General Public License along with
 // this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pub mod credits;
-pub mod keg_main;
-pub mod kegs;
-pub mod setup_wizard;
+use crate::view::prelude::*;
+
+pub struct KegMainView;
+
+impl View for KegMainView {}

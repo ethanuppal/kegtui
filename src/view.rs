@@ -120,8 +120,9 @@ pub trait View {
         state: &AsyncState,
         frame: &mut Frame<'_>,
         area: Rect,
+        is_focused: bool,
     ) -> Result<()> {
-        let _ = (app, state, frame, area);
+        let _ = (app, state, frame, area, is_focused);
         Ok(())
     }
 
@@ -130,24 +131,24 @@ pub trait View {
         &self,
         app: &App,
         state: &AsyncState,
-    ) -> ViewInteractivity {
+    ) -> Result<ViewInteractivity> {
         let _ = (app, state);
-        ViewInteractivity::None
+        Ok(ViewInteractivity::None)
     }
 
-    /// Notifies that an `index` has been selected/scrolled to.
-    fn interact(&self, app: &mut App, state: &AsyncState, index: usize) {
-        let _ = (app, state, index);
-    }
+    ///// Notifies that an `index` has been selected/scrolled to.
+    //fn interact(&self, app: &mut App, state: &AsyncState, index: usize) {
+    //    let _ = (app, state, index);
+    //}
 
     fn click(
         &self,
         app: &mut App,
         state: &AsyncState,
         index: usize,
-    ) -> Option<NavAction> {
+    ) -> Result<Option<NavAction>> {
         let _ = (app, state, index);
-        None
+        Ok(None)
     }
 }
 
@@ -222,7 +223,9 @@ impl<'a> NavContext<'a> {
         match id {
             NavID::Index(index) => index,
             NavID::Named(name) => {
-                self.named_nav_ids.get(name).copied().unwrap()
+                self.named_nav_ids.get(name).copied().unwrap_or_else(|| {
+                    panic!("No nav named '{name}' exists in the context")
+                })
             }
         }
     }

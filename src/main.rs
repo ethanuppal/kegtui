@@ -24,6 +24,7 @@ use crate::{
 use app::spawn_worker;
 use checks::is_kegworks_installed;
 use color_eyre::{eyre::eyre, Result};
+use view::NavAction;
 
 pub mod app;
 pub mod checks;
@@ -840,8 +841,6 @@ fn copy_to_clipboard(text: &str) -> Result<()> {
 fn main() -> Result<()> {
     let mut context = NavContext::default();
 
-    let kegs_view = context.view("kegs", &views::kegs::KegsView);
-    let credits_view = context.view("credits", &views::credits::CreditsView);
     let setup_wizard_view =
         context.view("wizard", &views::setup_wizard::SetupWizardView);
 
@@ -852,11 +851,26 @@ fn main() -> Result<()> {
             MenuItemAction::LoadView(setup_wizard_view),
         )],
     );
+
+    let kegs_view = context.view("kegs", &views::kegs::KegsView);
+    let credits_view = context.view("credits", &views::credits::CreditsView);
+
     let main_nav = context.nav(
         "main",
         [
             MenuItem::new("Kegs", MenuItemAction::LoadView(kegs_view)),
             MenuItem::new("Credits", MenuItemAction::LoadView(credits_view)),
+        ],
+    );
+
+    let keg_main_view = context.view("keg_main", &views::keg_main::KegMainView);
+
+    let keg_nav = context.nav(
+        "keg",
+        [
+            MenuItem::new("Back", MenuItemAction::NavAction(NavAction::Pop)),
+            MenuItem::new("Main", MenuItemAction::LoadView(keg_main_view))
+                .default(),
         ],
     );
 

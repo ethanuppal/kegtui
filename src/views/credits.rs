@@ -26,6 +26,7 @@ impl View for CreditsView {
         _state: &AsyncState,
         frame: &mut ratatui::Frame<'_>,
         area: ratatui::prelude::Rect,
+        _is_focused: bool,
     ) -> Result<()> {
         macro_rules! add_credits {
             (&mut $list:path, $source:literal) => {
@@ -86,7 +87,7 @@ impl View for CreditsView {
         &self,
         _app: &App,
         _state: &AsyncState,
-    ) -> ViewInteractivity {
-        ViewInteractivity::Scrollable
+    ) -> Result<ViewInteractivity> {
+        Ok(ViewInteractivity::Scrollable)
     }
 }

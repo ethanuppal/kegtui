@@ -21,18 +21,18 @@ use crate::keg_plist::KegPlist;
 
 #[derive(Debug, Clone)]
 pub struct Keg {
-    name: String,
-    config_file: PathBuf,
-    wineskin_launcher: OsString,
-    c_drive: PathBuf,
+    pub name: String,
+    pub config_file: PathBuf,
+    pub wineskin_launcher: OsString,
+    pub c_drive: PathBuf,
 }
 
 pub struct CurrentKeg {
-    name: String,
-    wineskin_launcher: OsString,
-    c_drive: PathBuf,
-    plist: KegPlist,
-    config_file: PathBuf,
+    pub name: String,
+    pub wineskin_launcher: OsString,
+    pub c_drive: PathBuf,
+    pub plist: KegPlist,
+    pub config_file: PathBuf,
 }
 
 impl Keg {
@@ -49,5 +49,19 @@ impl Keg {
                 .join("Contents/MacOS/wineskinLauncher")
                 .into_os_string(),
         }
+    }
+}
+
+impl TryFrom<&Keg> for CurrentKeg {
+    type Error = plist::Error;
+
+    fn try_from(value: &Keg) -> Result<Self, Self::Error> {
+        Ok(Self {
+            name: value.name.clone(),
+            wineskin_launcher: value.wineskin_launcher.clone(),
+            c_drive: value.c_drive.clone(),
+            plist: plist::from_file(&value.config_file)?,
+            config_file: value.config_file.clone(),
+        })
     }
 }
