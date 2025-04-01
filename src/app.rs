@@ -28,7 +28,7 @@ use crossterm::{
     ExecutableCommand,
 };
 use ratatui::{
-    widgets::{Block, Borders, Clear, List, ListItem, ListState},
+    widgets::{Block, Borders, Clear, List, ListItem, ListState, Padding},
     DefaultTerminal,
 };
 use symbols::line::VERTICAL;
@@ -43,6 +43,57 @@ pub const SELECTED_FOCUSED_STYLE: Style =
     Style::new().fg(Color::Yellow).add_modifier(Modifier::BOLD);
 pub const SELECTED_UNFOCUSED_STYLE: Style =
     Style::new().fg(Color::White).add_modifier(Modifier::BOLD);
+
+fn make_keybinds_help_table() -> (Table<'static>, u16, u16) {
+    macro_rules! make {
+        ($((
+            [$($lhs:literal),*],
+            $rhs:literal
+        )),*) => {{
+            const SEPARATOR: &str = ", ";
+            let mut lhs_width = 0;
+            let mut rhs_width = 0;
+            $(lhs_width = ::std::cmp::max(lhs_width, $($lhs.len() + SEPARATOR.len() + )* 0 - SEPARATOR.len());)*
+            $(rhs_width = ::std::cmp::max(rhs_width, $rhs.len());)*
+            let rows = vec![
+                $(
+                    Row::new(vec![
+                        Line::from({
+                            let mut keys = vec![];
+                            for (i, key) in [$($lhs),*].into_iter().enumerate() {
+                                if i > 0 {
+                                    keys.push(SEPARATOR.into());
+                                }
+                                keys.push(key.blue().bold());
+                            }
+                            keys
+                        }),
+                        $rhs.into()
+                    ])
+                ),*
+            ];
+            let height = rows.len();
+            let table = Table::new(
+                rows,
+                &[Constraint::Length(lhs_width as u16), Constraint::Length(rhs_width as u16)],
+            );
+            (table, (lhs_width + 1 + rhs_width) as u16, height as u16)
+        }};
+    }
+    make!(
+        (["<?>"], "Toggle this modal"),
+        (["<Esc>"], "Exit modal (in modal), focus menu (in content)"),
+        (["<Left>", "<H>"], "Focus menu"),
+        (["<Right>", "<L>"], "Focus content"),
+        (["<Up>", "<K>"], "Navigate up"),
+        (["<Down>", "<J>"], "Navigate down"),
+        (
+            ["<Enter>"],
+            "Focus content (in menu), select button (in content)"
+        ),
+        (["<Q>"], "Exit app")
+    )
+}
 
 #[derive(Default, PartialEq, Eq)]
 enum Focus {
@@ -61,6 +112,7 @@ pub struct App<'a> {
     clickables_state: usize,
     // ENDTODO
     pub current_keg: Option<CurrentKeg>,
+    show_keybinds_modal: bool,
 }
 
 impl<'a> App<'a> {
@@ -141,6 +193,31 @@ impl<'a> App<'a> {
             Clear.render(section_rects[2], frame.buffer_mut());
         }
 
+        if self.show_keybinds_modal {
+            let (modal_table, table_width, table_height) =
+                make_keybinds_help_table();
+            let modal_width = table_width + 4;
+            let modal_height = table_height + 4;
+
+            let modal_area = Rect {
+                x: area.x + (area.width.saturating_sub(modal_width)) / 2,
+                y: area.y + (area.height.saturating_sub(modal_height)) / 2,
+                width: modal_width,
+                height: modal_height,
+            };
+
+            frame.render_widget(Clear, modal_area);
+
+            let modal_block = Block::default()
+                .title(Span::from(" Keybinds ").into_centered_line())
+                .borders(Borders::ALL)
+                .padding(Padding::uniform(1));
+            let inner_modal_area = modal_block.inner(modal_area);
+
+            frame.render_widget(modal_block, modal_area);
+            frame.render_widget(modal_table, inner_modal_area);
+        }
+
         Ok(())
     }
     fn draw_menu(&mut self, frame: &mut Frame, area: Rect, menu: &[MenuItem]) {
@@ -215,6 +292,12 @@ impl<'a> App<'a> {
         state: &AsyncState,
         terminal: &mut DefaultTerminal,
     ) -> Result<()> {
+        if self.show_keybinds_modal {
+            if matches!(key_event.code, KeyCode::Esc | KeyCode::Char('?')) {
+                self.show_keybinds_modal = false;
+            }
+            return Ok(());
+        }
         let current_nav = context.top_nav().unwrap();
         let menu = context.get_nav(current_nav).menu();
         let current_menu_item = &menu[self.menu_state];
@@ -224,7 +307,9 @@ impl<'a> App<'a> {
             KeyCode::Esc => {
                 self.focus = Focus::Menu;
             }
-            KeyCode::Char('?') => {}
+            KeyCode::Char('?') => {
+                self.show_keybinds_modal = true;
+            }
             KeyCode::Up | KeyCode::Char('k') => match self.focus {
                 Focus::Menu => {
                     self.menu_state = self.menu_state.saturating_sub(1);
