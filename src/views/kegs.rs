@@ -16,4 +16,4 @@ use crate::{app::App, view::prelude::*};
 
 pub struct KegsView;
 
-impl View<App> for KegsView {}
+impl View for KegsView {}

@@ -36,17 +36,19 @@ enum Focus {
 }
 
 #[derive(Default)]
-pub struct App {
+pub struct App<'a> {
     exit: bool,
     focus: Focus,
     menu_state: usize,
+    current_view: Option<ViewID<'a>>,
+    clickables_state: usize,
     pub(crate) vertical_scroll: usize,
 }
 
-impl App {
-    pub fn run<'a>(
+impl<'a> App<'a> {
+    pub fn run(
         &mut self,
-        context: &mut NavContext<'a, App>,
+        context: &mut NavContext<'a>,
         initial: NavID<'a>,
         terminal: &mut DefaultTerminal,
         state: Arc<RwLock<AsyncState>>,
@@ -61,12 +63,12 @@ impl App {
             let now = Instant::now();
 
             if now < interval {
-                thread::sleep(interval - now);
+                //thread::sleep(interval - now);
             }
 
             if let Ok(state) = state.read() {
                 terminal.draw(|frame| self.draw(context, frame, &state))?;
-                self.handle_events(&state, terminal)?;
+                self.handle_events(context, &state, terminal)?;
             }
         }
         Ok(())
@@ -74,7 +76,7 @@ impl App {
 
     fn draw(
         &mut self,
-        context: &mut NavContext<'_, App>,
+        context: &mut NavContext,
         frame: &mut Frame,
         state: &AsyncState,
     ) {
@@ -151,6 +153,7 @@ impl App {
 
     fn handle_events(
         &mut self,
+        context: &mut NavContext<'a>,
         state: &AsyncState,
         terminal: &mut DefaultTerminal,
     ) -> Result<()> {
@@ -159,7 +162,7 @@ impl App {
                 Event::Key(key_event)
                     if key_event.kind == KeyEventKind::Press =>
                 {
-                    self.handle_key_event(key_event, state, terminal)?
+                    self.handle_key_event(context, key_event, state, terminal)?
                 }
                 _ => {}
             };
@@ -169,22 +172,97 @@ impl App {
 
     fn handle_key_event(
         &mut self,
+        context: &mut NavContext<'a>,
         key_event: KeyEvent,
         state: &AsyncState,
         terminal: &mut DefaultTerminal,
     ) -> Result<()> {
+        let current_nav = context.top_nav().unwrap();
+        let menu = context.get_nav_ref(current_nav).menu();
+        let current_menu_item = &menu[self.menu_state];
+
+        let select_length = match self.focus {
+            Focus::Menu => menu.len(),
+            Focus::Content => context
+                .get_view_ref(
+                    self.current_view
+                        .expect("View focused but app has no view"),
+                )
+                .clickables(&self)
+                .len(),
+        };
+
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
             KeyCode::Esc => {}
             KeyCode::Char('?') => {}
-            KeyCode::Up | KeyCode::Char('k') => {}
-            KeyCode::Down | KeyCode::Char('j') => {}
-            KeyCode::Left | KeyCode::Char('h') => {}
-            KeyCode::Right | KeyCode::Char('l') => {}
+            KeyCode::Up | KeyCode::Char('k') => match self.focus {
+                Focus::Menu => {
+                    self.menu_state = self.menu_state.saturating_sub(1);
+                }
+                Focus::Content => {
+                    self.clickables_state =
+                        self.clickables_state.saturating_sub(1);
+                }
+            },
+            KeyCode::Down | KeyCode::Char('j') => match self.focus {
+                Focus::Menu => {
+                    if self.menu_state + 1 < select_length {
+                        self.menu_state += 1;
+                    }
+                }
+                Focus::Content => {
+                    if self.clickables_state + 1 < select_length {
+                        self.clickables_state += 1;
+                    }
+                }
+            },
+            KeyCode::Left | KeyCode::Char('h') => {
+                self.focus = Focus::Menu;
+            }
+            KeyCode::Right | KeyCode::Char('l') => {
+                if self.focus == Focus::Menu {
+                    let action = current_menu_item.action().clone();
+                    self.execute_menu_action(context, action);
+                }
+            }
+
             KeyCode::Enter => {}
             _ => {}
         }
         Ok(())
+    }
+
+    fn execute_menu_action(
+        &mut self,
+        context: &mut NavContext<'a>,
+        menu_action: MenuItemAction<'a>,
+    ) {
+        match menu_action {
+            MenuItemAction::NavAction(nav_action) => {
+                self.execute_nav_action(context, nav_action)
+            }
+            MenuItemAction::LoadView(view_id) => {
+                self.load_view(view_id);
+            }
+        }
+    }
+
+    fn execute_nav_action(
+        &mut self,
+        context: &mut NavContext<'a>,
+        nav_action: NavAction<'a>,
+    ) {
+        match nav_action {
+            NavAction::Pop => context.pop_nav(),
+            NavAction::Push(nav_id) => context.push_nav(nav_id),
+        }
+    }
+
+    fn load_view(&mut self, view_id: ViewID<'a>) {
+        self.current_view = Some(view_id);
+        self.focus = Focus::Content;
+        self.clickables_state = 0;
     }
 
     fn exit(&mut self) {

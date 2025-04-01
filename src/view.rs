@@ -17,6 +17,8 @@ use std::{borrow::Cow, collections::HashMap};
 use color_eyre::eyre::Result;
 use ratatui::{layout::Rect, DefaultTerminal, Frame};
 
+use crate::app::App;
+
 pub mod prelude {
     pub use super::*;
     pub use color_eyre::Result;
@@ -29,7 +31,7 @@ pub mod prelude {
     };
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ViewID<'a> {
     Index(usize),
     Named(&'a str),
@@ -41,11 +43,13 @@ pub enum NavID<'a> {
     Named(&'a str),
 }
 
+#[derive(Clone)]
 pub enum NavAction<'a> {
     Pop,
     Push(NavID<'a>),
 }
 
+#[derive(Clone)]
 pub enum MenuItemAction<'a> {
     NavAction(NavAction<'a>),
     LoadView(ViewID<'a>),
@@ -77,6 +81,10 @@ impl<'a> MenuItem<'a> {
     pub fn name(&self) -> &str {
         &self.name
     }
+
+    pub fn action(&self) -> &MenuItemAction<'a> {
+        &self.action
+    }
 }
 
 pub struct Nav<'a> {
@@ -94,14 +102,14 @@ impl<'a> Nav<'a> {
     }
 }
 
-pub trait View<State> {
+pub trait View {
     ///// The menu items this view exposes.
     //fn menu<'a>(&self, state: &State) -> Vec<MenuItem<'a>>;
 
     /// Draw the views content.
     fn draw_content(
         &self,
-        state: &State,
+        state: &App,
         frame: &mut Frame<'_>,
         area: Rect,
     ) -> Result<()> {
@@ -110,33 +118,33 @@ pub trait View<State> {
     }
 
     /// Clickable objects currently drawn.
-    fn clickables(&self, state: &State) -> Vec<usize> {
+    fn clickables(&self, state: &App) -> Vec<usize> {
         let _ = state;
         vec![]
     }
 
     /// Notifies that a clickable has been selected.
-    fn select(&mut self, state: &mut State, index: usize) {
+    fn select(&mut self, state: &mut App, index: usize) {
         let _ = (state, index);
     }
 
-    fn click(&mut self, state: &mut State, index: usize) -> Option<NavAction> {
+    fn click(&mut self, state: &mut App, index: usize) -> Option<NavAction> {
         let _ = (state, index);
         None
     }
 }
 
 #[derive(Default)]
-pub struct NavContext<'a, State> {
-    views: Vec<&'a dyn View<State>>,
+pub struct NavContext<'a> {
+    views: Vec<&'a dyn View>,
     named_view_ids: HashMap<&'a str, usize>,
     navs: Vec<Nav<'a>>,
     named_nav_ids: HashMap<&'a str, usize>,
     stack: Vec<NavID<'a>>,
 }
 
-impl<'a, State> NavContext<'a, State> {
-    pub fn view<V: View<State> + 'a>(
+impl<'a> NavContext<'a> {
+    pub fn view<V: View + 'a>(
         &mut self,
         name: &'a str,
         view: &'a V,
@@ -168,15 +176,19 @@ impl<'a, State> NavContext<'a, State> {
         self.stack.push(nav);
     }
 
+    pub fn pop_nav(&mut self) {
+        let _ = self.stack.pop();
+    }
+
     pub fn top_nav(&self) -> Option<NavID<'a>> {
         self.stack.last().copied()
     }
 
-    pub fn get_view_ref(&self, id: ViewID<'a>) -> &'a dyn View<State> {
+    pub fn get_view_ref(&self, id: ViewID<'a>) -> &'a dyn View {
         self.views[self.get_view_index(id)]
     }
 
-    pub fn get_nav_ref(&self, id: NavID<'a>) -> &Nav {
+    pub fn get_nav_ref(&self, id: NavID<'a>) -> &Nav<'a> {
         &self.navs[self.get_nav_index(id)]
     }
 

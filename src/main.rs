@@ -866,7 +866,7 @@ fn copy_to_clipboard(text: &str) -> Result<()> {
 //}
 
 fn main() -> Result<()> {
-    let mut context = NavContext::<App>::default();
+    let mut context = NavContext::default();
 
     let kegs_view = context.view("kegs", &views::kegs::KegsView);
     let credits_view = context.view("credits", &views::credits::CreditsView);

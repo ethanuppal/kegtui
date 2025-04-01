@@ -16,7 +16,7 @@ use crate::{app::App, view::prelude::*};
 
 pub struct CreditsView;
 
-impl View<App> for CreditsView {
+impl View for CreditsView {
     fn draw_content(
         &self,
         app: &App,

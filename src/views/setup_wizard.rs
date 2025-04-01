@@ -16,4 +16,4 @@ use crate::{app::App, view::prelude::*};
 
 pub struct SetupWizardView;
 
-impl View<App> for SetupWizardView {}
+impl View for SetupWizardView {}
