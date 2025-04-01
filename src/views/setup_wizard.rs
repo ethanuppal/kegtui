@@ -85,7 +85,12 @@ impl View for SetupWizardView {
 
         frame.render_widget(table, chunks[0]);
 
-        let mut help_items = Vec::new();
+        let mut help_items = vec![
+            ListItem::new(
+                "Restart kegtui if everything is installed".green().bold(),
+            ),
+            ListItem::new(""),
+        ];
         let brew_missing = state.brew_installed == Some(false);
         let kegworks_missing = state.kegworks_installed == Some(false);
 
@@ -160,9 +165,9 @@ impl View for SetupWizardView {
 
             let mut real_state = ListState::default().with_selected(Some(
                 match app.interaction_state() {
-                    0 => 1,
-                    1 => 5,
-                    2 => 10,
+                    0 => 3,
+                    1 => 7,
+                    2 => 12,
                     _ => unreachable!(),
                 },
             ));

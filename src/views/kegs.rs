@@ -12,7 +12,7 @@
 // You should have received a copy of the GNU General Public License along with
 // this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use ratatui::widgets::{List, ListItem, ListState};
+use ratatui::widgets::{List, ListItem, ListState, Wrap};
 
 use crate::{
     app::{App, AsyncState, SELECTED_FOCUSED_STYLE, SELECTED_UNFOCUSED_STYLE},
@@ -30,7 +30,8 @@ impl View for KegsView {
         area: Rect,
         is_focused: bool,
     ) -> Result<()> {
-        let keg_title = Paragraph::new("Select a Keg:");
+        let keg_title =
+            Paragraph::new("Select a Keg (kegs are searched under /Applications/, ~/Applications/, and ~/Applications/Kegworks/):").wrap(Wrap { trim: false });
         frame.render_widget(keg_title, Rect { height: 1, ..area });
 
         if !state.kegs.is_empty() {
