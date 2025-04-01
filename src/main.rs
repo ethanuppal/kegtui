@@ -1,3 +1,17 @@
+// Copyright (C) 2024 Ethan Uppal.
+//
+// This program is free software: you can redistribute it and/or modify it under
+// the terms of the GNU General Public License as published by the Free Software
+// Foundation, version 3 of the License only.
+//
+// This program is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+// FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+// details.
+//
+// You should have received a copy of the GNU General Public License along with
+// this program.  If not, see <https://www.gnu.org/licenses/>.
+
 use std::{
     ffi::OsString,
     fs,
@@ -10,6 +24,7 @@ use std::{
 
 use color_eyre::{Result, eyre::eyre};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use kegworks_plist::KegworksPlist;
 use ratatui::{
     DefaultTerminal, Frame,
     layout::{Constraint, Direction, Layout, Margin, Rect},
@@ -23,6 +38,8 @@ use ratatui::{
 };
 use strum::{EnumCount, VariantNames};
 use strum_macros::{AsRefStr, EnumCount, FromRepr, VariantNames};
+
+mod kegworks_plist;
 
 #[derive(PartialEq, Eq, Clone, Copy, EnumCount)]
 #[repr(usize)]
@@ -69,6 +86,12 @@ struct Keg {
     name: String,
     config_file: PathBuf,
     wineskin_launcher: OsString,
+}
+
+struct CurrentKeg {
+    name: String,
+    wineskin_launcher: OsString,
+    config: KegworksPlist,
 }
 
 impl Keg {
@@ -118,8 +141,8 @@ struct App {
     current_modal: Option<Modal>,
     credits_vertical_scroll: usize,
     keg_selection: ListState,
+    current_keg: Option<CurrentKeg>,
     setup_wizard_help_list_state: ListState,
-    current_keg: Option<Keg>,
 }
 
 impl App {
@@ -140,8 +163,8 @@ impl App {
             current_modal: None,
             credits_vertical_scroll: 0,
             keg_selection: ListState::default(),
-            setup_wizard_help_list_state: ListState::default(),
             current_keg: None,
+            setup_wizard_help_list_state: ListState::default(),
         }
     }
 
@@ -569,7 +592,9 @@ impl App {
         )];
         add_credits!(&mut credits_list, "color-eyre");
         add_credits!(&mut credits_list, "crossterm");
+        add_credits!(&mut credits_list, "plist");
         add_credits!(&mut credits_list, "ratatui");
+        add_credits!(&mut credits_list, "serde");
         add_credits!(&mut credits_list, "strum");
         add_credits!(&mut credits_list, "strum_macros");
         add_credits!(&mut credits_list, "textwrap");
@@ -729,13 +754,16 @@ impl App {
                     self.focus = Focus::Menu;
                     self.menu_state_mut()
                         .select(Some(KegMenuItem::Main as usize));
-                    self.current_keg = Some(
-                        state.kegs[self
-                            .keg_selection
-                            .selected()
-                            .expect("Should have been set to something")]
-                        .clone(),
-                    )
+                    let keg = &state.kegs[self
+                        .keg_selection
+                        .selected()
+                        .expect("Should have been set to something")];
+
+                    self.current_keg = Some(CurrentKeg {
+                        name: keg.name.clone(),
+                        wineskin_launcher: keg.wineskin_launcher.clone(),
+                        config: plist::from_file(&keg.config_file)?,
+                    })
                 } else if self.focus == Focus::Content
                     && self.current_view == View::SetupWizard
                 {
