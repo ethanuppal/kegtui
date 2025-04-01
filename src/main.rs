@@ -13,9 +13,10 @@
 // this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
+    env,
     ffi::OsString,
     fs,
-    io::Write,
+    io::{self, Write},
     path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::{Arc, RwLock},
@@ -23,7 +24,14 @@ use std::{
 };
 
 use color_eyre::{Result, eyre::eyre};
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use crossterm::{
+    ExecutableCommand,
+    event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
+    terminal::{
+        EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode,
+        enable_raw_mode,
+    },
+};
 use kegworks_plist::KegworksPlist;
 use ratatui::{
     DefaultTerminal, Frame,
@@ -67,6 +75,8 @@ enum KegMenuItem {
     Back,
     Main,
     Winetricks,
+    #[strum(to_string = "Open C Drive")]
+    CDrive,
     Config,
 }
 
@@ -86,12 +96,14 @@ struct Keg {
     name: String,
     config_file: PathBuf,
     wineskin_launcher: OsString,
+    c_drive: PathBuf,
 }
 
 struct CurrentKeg {
     name: String,
     wineskin_launcher: OsString,
-    config: KegworksPlist,
+    c_drive: PathBuf,
+    plist: KegworksPlist,
 }
 
 impl Keg {
@@ -103,6 +115,7 @@ impl Keg {
                 .to_string_lossy()
                 .to_string(),
             config_file: path.join("Contents/Info.plist"),
+            c_drive: path.join("Contents/drive_c"),
             wineskin_launcher: path
                 .join("Contents/MacOS/wineskinLauncher")
                 .into_os_string(),
@@ -187,7 +200,7 @@ impl App {
         while !self.exit {
             if let Ok(state) = state.read() {
                 terminal.draw(|frame| self.draw(frame, &state))?;
-                self.handle_events(&state)?;
+                self.handle_events(&state, terminal)?;
             }
             interval.tick().await;
         }
@@ -372,6 +385,7 @@ impl App {
                     KegMenuItem::Back => {}
                     KegMenuItem::Main => {}
                     KegMenuItem::Winetricks => {}
+                    KegMenuItem::CDrive => {}
                     KegMenuItem::Config => {}
                 }
             }
@@ -621,13 +635,17 @@ impl App {
         );
     }
 
-    fn handle_events(&mut self, state: &AsyncState) -> Result<()> {
+    fn handle_events(
+        &mut self,
+        state: &AsyncState,
+        terminal: &mut DefaultTerminal,
+    ) -> Result<()> {
         if event::poll(time::Duration::from_millis(5))? {
             match event::read()? {
                 Event::Key(key_event)
                     if key_event.kind == KeyEventKind::Press =>
                 {
-                    self.handle_key_event(key_event, state)?
+                    self.handle_key_event(key_event, state, terminal)?
                 }
                 _ => {}
             };
@@ -639,6 +657,7 @@ impl App {
         &mut self,
         key_event: KeyEvent,
         state: &AsyncState,
+        terminal: &mut DefaultTerminal,
     ) -> Result<()> {
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
@@ -740,6 +759,54 @@ impl App {
                             View::Keg => {
                                 if item == KegMenuItem::Back.as_ref() {
                                     self.current_view = View::Main;
+                                } else if item == KegMenuItem::Config.as_ref() {
+                                    if let Some(current_keg) =
+                                        self.current_keg.as_mut()
+                                    {
+                                        let toml_config =
+                                            toml::to_string_pretty(
+                                                &current_keg
+                                                    .plist
+                                                    .extract_config(),
+                                            )?;
+                                        let new_toml_config = Self::run_editor(
+                                            terminal,
+                                            toml_config,
+                                        )?;
+                                        let new_config =
+                                            toml::from_str(&new_toml_config)?;
+                                        current_keg
+                                            .plist
+                                            .update_from_config(&new_config);
+                                    }
+                                } else if item == KegMenuItem::CDrive.as_ref() {
+                                    if let Some(explorer) =
+                                        env::var("EXPLORER").ok()
+                                    {
+                                        Self::run_program(
+                                            terminal,
+                                            Command::new(explorer).arg(
+                                                self.current_keg
+                                                    .as_ref()
+                                                    .unwrap()
+                                                    .c_drive
+                                                    .to_string_lossy()
+                                                    .to_string(),
+                                            ),
+                                        )?;
+                                    } else {
+                                        Self::run_program(
+                                            terminal,
+                                            Command::new("open").arg(
+                                                self.current_keg
+                                                    .as_ref()
+                                                    .unwrap()
+                                                    .c_drive
+                                                    .to_string_lossy()
+                                                    .to_string(),
+                                            ),
+                                        )?;
+                                    }
                                 } else {
                                     self.focus = Focus::Content;
                                 }
@@ -762,7 +829,8 @@ impl App {
                     self.current_keg = Some(CurrentKeg {
                         name: keg.name.clone(),
                         wineskin_launcher: keg.wineskin_launcher.clone(),
-                        config: plist::from_file(&keg.config_file)?,
+                        c_drive: keg.c_drive.clone(),
+                        plist: plist::from_file(&keg.config_file)?,
                     })
                 } else if self.focus == Focus::Content
                     && self.current_view == View::SetupWizard
@@ -853,6 +921,34 @@ impl App {
 
     fn exit(&mut self) {
         self.exit = true;
+    }
+
+    fn run_editor(
+        terminal: &mut DefaultTerminal,
+        initial: impl Into<String>,
+    ) -> Result<String> {
+        fs::write("/tmp/kegtui.toml", initial.into())?;
+        io::stdout().execute(LeaveAlternateScreen)?;
+        disable_raw_mode()?;
+        let editor = env::var("EDITOR").unwrap_or("vim".into());
+        Command::new(editor).arg("/tmp/kegtui.toml").status()?;
+        io::stdout().execute(EnterAlternateScreen)?;
+        enable_raw_mode()?;
+        terminal.clear()?;
+        Ok(fs::read_to_string("/tmp/kegtui.toml")?)
+    }
+
+    fn run_program(
+        terminal: &mut DefaultTerminal,
+        command: &mut Command,
+    ) -> Result<()> {
+        io::stdout().execute(LeaveAlternateScreen)?;
+        disable_raw_mode()?;
+        command.status()?;
+        io::stdout().execute(EnterAlternateScreen)?;
+        enable_raw_mode()?;
+        terminal.clear()?;
+        Ok(())
     }
 }
 
