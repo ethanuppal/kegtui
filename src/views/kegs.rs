@@ -12,6 +12,8 @@
 // You should have received a copy of the GNU General Public License along with
 // this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pub mod credits;
-pub mod kegs;
-pub mod setup_wizard;
+use crate::{app::App, view::prelude::*};
+
+pub struct KegsView;
+
+impl View<App> for KegsView {}

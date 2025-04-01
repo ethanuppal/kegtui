@@ -53,6 +53,7 @@ pub enum MenuItemAction<'a> {
 
 pub struct MenuItem<'a> {
     name: Cow<'a, str>,
+    is_default: bool,
     action: MenuItemAction<'a>,
 }
 
@@ -63,13 +64,34 @@ impl<'a> MenuItem<'a> {
     ) -> Self {
         Self {
             name: name.into(),
+            is_default: false,
             action,
         }
+    }
+
+    pub fn default(mut self) -> Self {
+        self.is_default = true;
+        self
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
     }
 }
 
 pub struct Nav<'a> {
     menu: Vec<MenuItem<'a>>,
+    default_item: usize,
+}
+
+impl<'a> Nav<'a> {
+    pub fn menu(&self) -> &[MenuItem<'a>] {
+        &self.menu
+    }
+
+    pub fn default_item(&self) -> usize {
+        self.default_item
+    }
 }
 
 pub trait View<State> {
@@ -129,9 +151,15 @@ impl<'a, State> NavContext<'a, State> {
         name: &'a str,
         menu: impl IntoIterator<Item = MenuItem<'a>>,
     ) -> NavID<'a> {
-        self.navs.push(Nav {
-            menu: menu.into_iter().collect(),
-        });
+        let menu = menu.into_iter().collect::<Vec<_>>();
+        let default_item = menu
+            .iter()
+            .enumerate()
+            .find(|(_, item)| item.is_default)
+            .map(|(index, _)| index)
+            .unwrap_or(0);
+        assert!(!menu.is_empty());
+        self.navs.push(Nav { menu, default_item });
         self.named_nav_ids.insert(name, self.navs.len() - 1);
         NavID::Index(self.navs.len() - 1)
     }

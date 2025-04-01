@@ -21,16 +21,25 @@ use std::{
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
-    widgets::{Block, Borders},
+    widgets::{Block, Borders, List, ListItem, ListState},
     DefaultTerminal,
 };
 use symbols::line::VERTICAL;
 
 use crate::{checks, keg::Keg, view::prelude::*};
 
+#[derive(Default, PartialEq, Eq)]
+enum Focus {
+    #[default]
+    Menu,
+    Content,
+}
+
 #[derive(Default)]
 pub struct App {
     exit: bool,
+    focus: Focus,
+    menu_state: usize,
     pub(crate) vertical_scroll: usize,
 }
 
@@ -99,30 +108,38 @@ impl App {
             .split(inner_area);
 
         if let Some(current_nav) = context.top_nav() {
-            self.draw_menu(frame, section_rects[0]);
+            let menu = context.get_nav_ref(current_nav).menu();
+            self.draw_menu(frame, section_rects[0], menu);
             self.draw_vertical_separator(frame, section_rects[1]);
             //self.draw_content(frame, section_rects[2], state);
         }
     }
-    fn draw_menu(&mut self, frame: &mut Frame<'_>, area: Rect) {
-        //let menu_items: Vec<ListItem> = self
-        //    .menu_items()
-        //    .iter()
-        //    .cloned()
-        //    .map(|item| ListItem::new(Span::from(item)))
-        //    .collect();
-        //let menu = List::new(menu_items)
-        //    .highlight_style(
-        //        Style::default()
-        //            .fg(if self.focus == Focus::Menu {
-        //                Color::Yellow
-        //            } else {
-        //                Color::Gray
-        //            })
-        //            .add_modifier(Modifier::BOLD),
-        //    )
-        //    .highlight_symbol(">> ");
-        //frame.render_stateful_widget(menu, area, self.menu_state_mut());
+    fn draw_menu(
+        &mut self,
+        frame: &mut Frame<'_>,
+        area: Rect,
+        menu: &[MenuItem],
+    ) {
+        let menu_items: Vec<ListItem> = menu
+            .iter()
+            .map(|item| ListItem::new(Span::from(item.name())))
+            .collect();
+        let menu = List::new(menu_items)
+            .highlight_style(
+                Style::default()
+                    .fg(if self.focus == Focus::Menu {
+                        Color::Yellow
+                    } else {
+                        Color::Gray
+                    })
+                    .add_modifier(Modifier::BOLD),
+            )
+            .highlight_symbol(">> ");
+        frame.render_stateful_widget(
+            menu,
+            area,
+            &mut ListState::default().with_selected(Some(self.menu_state)),
+        );
     }
 
     fn draw_vertical_separator(&mut self, frame: &mut Frame<'_>, area: Rect) {
@@ -158,6 +175,13 @@ impl App {
     ) -> Result<()> {
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
+            KeyCode::Esc => {}
+            KeyCode::Char('?') => {}
+            KeyCode::Up | KeyCode::Char('k') => {}
+            KeyCode::Down | KeyCode::Char('j') => {}
+            KeyCode::Left | KeyCode::Char('h') => {}
+            KeyCode::Right | KeyCode::Char('l') => {}
+            KeyCode::Enter => {}
             _ => {}
         }
         Ok(())

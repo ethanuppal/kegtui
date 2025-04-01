@@ -868,6 +868,7 @@ fn copy_to_clipboard(text: &str) -> Result<()> {
 fn main() -> Result<()> {
     let mut context = NavContext::<App>::default();
 
+    let kegs_view = context.view("kegs", &views::kegs::KegsView);
     let credits_view = context.view("credits", &views::credits::CreditsView);
     let setup_wizard_view =
         context.view("wizard", &views::setup_wizard::SetupWizardView);
@@ -881,10 +882,10 @@ fn main() -> Result<()> {
     );
     let main_nav = context.nav(
         "main",
-        [MenuItem::new(
-            "Credits",
-            MenuItemAction::LoadView(credits_view),
-        )],
+        [
+            MenuItem::new("Kegs", MenuItemAction::LoadView(kegs_view)),
+            MenuItem::new("Credits", MenuItemAction::LoadView(credits_view)),
+        ],
     );
 
     let (async_state, _terminate_worker_guard) = spawn_worker();
