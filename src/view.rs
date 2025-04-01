@@ -97,7 +97,7 @@ impl<'a> Nav<'a> {
         &self.menu
     }
 
-    pub fn default_item(&self) -> usize {
+    pub fn default_item_index(&self) -> usize {
         self.default_item
     }
 }
@@ -124,11 +124,11 @@ pub trait View {
     }
 
     /// Notifies that a clickable has been selected.
-    fn select(&mut self, state: &mut App, index: usize) {
+    fn select(&self, state: &mut App, index: usize) {
         let _ = (state, index);
     }
 
-    fn click(&mut self, state: &mut App, index: usize) -> Option<NavAction> {
+    fn click(&self, state: &mut App, index: usize) -> Option<NavAction> {
         let _ = (state, index);
         None
     }
@@ -184,11 +184,11 @@ impl<'a> NavContext<'a> {
         self.stack.last().copied()
     }
 
-    pub fn get_view_ref(&self, id: ViewID<'a>) -> &'a dyn View {
+    pub fn get_view(&self, id: ViewID<'a>) -> &'a dyn View {
         self.views[self.get_view_index(id)]
     }
 
-    pub fn get_nav_ref(&self, id: NavID<'a>) -> &Nav<'a> {
+    pub fn get_nav(&self, id: NavID<'a>) -> &Nav<'a> {
         &self.navs[self.get_nav_index(id)]
     }
 

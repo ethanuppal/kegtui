@@ -37,11 +37,13 @@ enum Focus {
 
 #[derive(Default)]
 pub struct App<'a> {
+    // TODO: separate this state out of App into something like a NavController
     exit: bool,
     focus: Focus,
     menu_state: usize,
     current_view: Option<ViewID<'a>>,
     clickables_state: usize,
+    // ENDTODO
     pub(crate) vertical_scroll: usize,
 }
 
@@ -110,7 +112,7 @@ impl<'a> App<'a> {
             .split(inner_area);
 
         if let Some(current_nav) = context.top_nav() {
-            let menu = context.get_nav_ref(current_nav).menu();
+            let menu = context.get_nav(current_nav).menu();
             self.draw_menu(frame, section_rects[0], menu);
             self.draw_vertical_separator(frame, section_rects[1]);
             //self.draw_content(frame, section_rects[2], state);
@@ -178,13 +180,13 @@ impl<'a> App<'a> {
         terminal: &mut DefaultTerminal,
     ) -> Result<()> {
         let current_nav = context.top_nav().unwrap();
-        let menu = context.get_nav_ref(current_nav).menu();
+        let menu = context.get_nav(current_nav).menu();
         let current_menu_item = &menu[self.menu_state];
 
         let select_length = match self.focus {
             Focus::Menu => menu.len(),
             Focus::Content => context
-                .get_view_ref(
+                .get_view(
                     self.current_view
                         .expect("View focused but app has no view"),
                 )
@@ -194,7 +196,9 @@ impl<'a> App<'a> {
 
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
-            KeyCode::Esc => {}
+            KeyCode::Esc => {
+                self.focus = Focus::Menu;
+            }
             KeyCode::Char('?') => {}
             KeyCode::Up | KeyCode::Char('k') => match self.focus {
                 Focus::Menu => {
@@ -227,7 +231,23 @@ impl<'a> App<'a> {
                 }
             }
 
-            KeyCode::Enter => {}
+            KeyCode::Enter => match self.focus {
+                Focus::Menu => {
+                    let menu_action = current_menu_item.action().clone();
+                    self.execute_menu_action(context, menu_action);
+                }
+                Focus::Content => {
+                    if let Some(nav_action) =
+                        context
+                            .get_view(self.current_view.expect(
+                                "Focused view but app has no current view",
+                            ))
+                            .click(self, self.clickables_state)
+                    {
+                        self.execute_nav_action(context, nav_action);
+                    }
+                }
+            },
             _ => {}
         }
         Ok(())
@@ -255,7 +275,12 @@ impl<'a> App<'a> {
     ) {
         match nav_action {
             NavAction::Pop => context.pop_nav(),
-            NavAction::Push(nav_id) => context.push_nav(nav_id),
+            NavAction::Push(nav_id) => {
+                context.push_nav(nav_id);
+                self.menu_state = context
+                    .get_nav(context.top_nav().unwrap())
+                    .default_item_index();
+            }
         }
     }
 

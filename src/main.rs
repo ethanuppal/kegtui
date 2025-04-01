@@ -13,7 +13,7 @@
 // this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
-    io::{Write},
+    io::Write,
     process::{Command, Stdio},
 };
 
