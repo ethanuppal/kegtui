@@ -53,6 +53,7 @@ pub enum NavAction<'a> {
 pub enum MenuItemAction<'a> {
     NavAction(NavAction<'a>),
     LoadView(ViewID<'a>),
+    External(fn(&mut App, &AsyncState) -> Result<()>),
 }
 
 pub struct MenuItem<'a> {
@@ -135,11 +136,6 @@ pub trait View {
         let _ = (app, state);
         Ok(ViewInteractivity::None)
     }
-
-    ///// Notifies that an `index` has been selected/scrolled to.
-    //fn interact(&self, app: &mut App, state: &AsyncState, index: usize) {
-    //    let _ = (app, state, index);
-    //}
 
     fn click(
         &self,

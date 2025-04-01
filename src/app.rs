@@ -13,13 +13,20 @@
 // this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
-    fs,
+    fs, io,
     sync::{self, Arc, RwLock},
     thread,
     time::{Duration, Instant},
 };
 
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use crossterm::{
+    event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
+    terminal::{
+        disable_raw_mode, enable_raw_mode, EnterAlternateScreen,
+        LeaveAlternateScreen,
+    },
+    ExecutableCommand,
+};
 use ratatui::{
     widgets::{Block, Borders, Clear, List, ListItem, ListState},
     DefaultTerminal,
@@ -270,14 +277,24 @@ impl<'a> App<'a> {
             KeyCode::Right | KeyCode::Char('l') => {
                 if self.focus == Focus::Menu {
                     let menu_action = current_menu_item.action().clone();
-                    self.execute_menu_action(context, menu_action);
+                    self.execute_menu_action(
+                        context,
+                        state,
+                        terminal,
+                        menu_action,
+                    )?;
                 }
             }
 
             KeyCode::Enter => match self.focus {
                 Focus::Menu => {
                     let menu_action = current_menu_item.action().clone();
-                    self.execute_menu_action(context, menu_action);
+                    self.execute_menu_action(
+                        context,
+                        state,
+                        terminal,
+                        menu_action,
+                    )?;
                 }
                 Focus::Content => {
                     if let Some(nav_action) =
@@ -299,8 +316,10 @@ impl<'a> App<'a> {
     fn execute_menu_action(
         &mut self,
         context: &mut NavContext<'a>,
+        state: &AsyncState,
+        terminal: &mut DefaultTerminal,
         menu_action: MenuItemAction<'a>,
-    ) {
+    ) -> Result<()> {
         match menu_action {
             MenuItemAction::NavAction(nav_action) => {
                 self.execute_nav_action(context, nav_action)
@@ -308,7 +327,16 @@ impl<'a> App<'a> {
             MenuItemAction::LoadView(view_id) => {
                 self.load_view(view_id);
             }
+            MenuItemAction::External(external) => {
+                io::stdout().execute(LeaveAlternateScreen)?;
+                disable_raw_mode()?;
+                external(self, state)?;
+                io::stdout().execute(EnterAlternateScreen)?;
+                enable_raw_mode()?;
+                terminal.clear()?;
+            }
         }
+        Ok(())
     }
 
     fn execute_nav_action(

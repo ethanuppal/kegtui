@@ -25,6 +25,7 @@ use app::spawn_worker;
 use checks::is_kegworks_installed;
 use color_eyre::{eyre::eyre, Result};
 use view::NavAction;
+use views::keg_main::{edit_config, open_c_drive};
 
 pub mod app;
 pub mod checks;
@@ -871,6 +872,12 @@ fn main() -> Result<()> {
             MenuItem::new("Back", MenuItemAction::NavAction(NavAction::Pop)),
             MenuItem::new("Main", MenuItemAction::LoadView(keg_main_view))
                 .default(),
+            //MenuItem::new("Winetricks", todo!()),
+            MenuItem::new(
+                "Open C Drive",
+                MenuItemAction::External(open_c_drive),
+            ),
+            MenuItem::new("Edit Config", MenuItemAction::External(edit_config)),
         ],
     );
 
