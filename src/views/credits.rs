@@ -24,7 +24,7 @@ impl View for CreditsView {
         &self,
         app: &App,
         _state: &AsyncState,
-        frame: &mut ratatui::Frame<'_>,
+        frame: &mut Frame,
         area: ratatui::prelude::Rect,
         _is_focused: bool,
     ) -> Result<()> {

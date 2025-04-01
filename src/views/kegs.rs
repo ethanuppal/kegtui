@@ -26,7 +26,7 @@ impl View for KegsView {
         &self,
         app: &App,
         state: &AsyncState,
-        frame: &mut Frame<'_>,
+        frame: &mut Frame,
         area: Rect,
         is_focused: bool,
     ) -> Result<()> {

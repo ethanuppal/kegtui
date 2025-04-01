@@ -221,6 +221,13 @@ impl<'a> App<'a> {
         Ok(())
     }
     fn draw_menu(&mut self, frame: &mut Frame, area: Rect, menu: &[MenuItem]) {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(1), Constraint::Min(0)])
+            .split(area);
+
+        frame.render_widget("Menu:".bold(), chunks[0]);
+
         let menu_items: Vec<ListItem> = menu
             .iter()
             .map(|item| ListItem::new(Span::from(item.name())))
@@ -234,7 +241,7 @@ impl<'a> App<'a> {
             .highlight_symbol(">> ");
         frame.render_stateful_widget(
             menu,
-            area,
+            chunks[1],
             &mut ListState::default().with_selected(Some(self.menu_state)),
         );
     }
