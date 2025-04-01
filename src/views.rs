@@ -12,8 +12,5 @@
 // You should have received a copy of the GNU General Public License along with
 // this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pub mod app;
-pub mod keg_config;
-pub mod keg_plist;
-pub mod view;
-pub mod views;
+pub mod credits;
+pub mod setup_wizard;
