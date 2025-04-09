@@ -25,6 +25,7 @@ pub struct Keg {
     pub config_file: PathBuf,
     pub wineskin_launcher: OsString,
     pub c_drive: PathBuf,
+    pub log_directory: PathBuf,
 }
 
 pub struct CurrentKeg {
@@ -33,6 +34,7 @@ pub struct CurrentKeg {
     pub c_drive: PathBuf,
     pub plist: KegPlist,
     pub config_file: PathBuf,
+    pub log_directory: PathBuf,
 }
 
 impl Keg {
@@ -48,6 +50,7 @@ impl Keg {
             wineskin_launcher: path
                 .join("Contents/MacOS/wineskinLauncher")
                 .into_os_string(),
+            log_directory: path.join("Contents/Logs"),
         }
     }
 }
@@ -62,6 +65,7 @@ impl TryFrom<&Keg> for CurrentKeg {
             c_drive: value.c_drive.clone(),
             plist: plist::from_file(&value.config_file)?,
             config_file: value.config_file.clone(),
+            log_directory: value.log_directory.clone(),
         })
     }
 }

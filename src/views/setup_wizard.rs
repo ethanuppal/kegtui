@@ -194,7 +194,7 @@ impl View for SetupWizardView {
 
     fn click(
         &self,
-        app: &mut App,
+        _app: &mut App,
         state: &AsyncState,
         index: usize,
     ) -> Result<Option<NavAction>> {

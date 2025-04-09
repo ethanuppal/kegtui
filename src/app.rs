@@ -20,16 +20,16 @@ use std::{
 };
 
 use crossterm::{
+    ExecutableCommand,
     event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     terminal::{
-        disable_raw_mode, enable_raw_mode, EnterAlternateScreen,
-        LeaveAlternateScreen,
+        EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode,
+        enable_raw_mode,
     },
-    ExecutableCommand,
 };
 use ratatui::{
-    widgets::{Block, Borders, Clear, List, ListItem, ListState, Padding},
     DefaultTerminal,
+    widgets::{Block, Borders, Clear, List, ListItem, ListState, Padding},
 };
 use symbols::line::VERTICAL;
 
@@ -341,7 +341,7 @@ impl<'a> App<'a> {
                             self.clickables_state =
                                 self.clickables_state.saturating_sub(3);
                         }
-                        ViewInteractivity::Clickables(count) => {
+                        ViewInteractivity::Clickables(_) => {
                             self.clickables_state =
                                 self.clickables_state.saturating_sub(1);
                         }
@@ -497,36 +497,38 @@ pub fn spawn_worker() -> (Arc<RwLock<AsyncState>>, TerminateWorkerGuard) {
 
     {
         let async_state = async_state.clone();
-        thread::spawn(move || loop {
-            if quit_rx.try_recv().is_ok() {
-                break;
-            }
-            let mut kegs = vec![];
-            for enclosing_location in [
-                "/Applications",
-                "~/Applications/",
-                "~/Applications/Kegworks/",
-            ] {
-                if let Ok(read_dir) = fs::read_dir(enclosing_location) {
-                    for entry in read_dir.flatten() {
-                        if entry
-                            .path()
-                            .join("Contents/KegworksConfig.app")
-                            .exists()
-                        {
-                            kegs.push(Keg::from_path(&entry.path()));
+        thread::spawn(move || {
+            loop {
+                if quit_rx.try_recv().is_ok() {
+                    break;
+                }
+                let mut kegs = vec![];
+                for enclosing_location in [
+                    "/Applications",
+                    "~/Applications/",
+                    "~/Applications/Kegworks/",
+                ] {
+                    if let Ok(read_dir) = fs::read_dir(enclosing_location) {
+                        for entry in read_dir.flatten() {
+                            if entry
+                                .path()
+                                .join("Contents/KegworksConfig.app")
+                                .exists()
+                            {
+                                kegs.push(Keg::from_path(&entry.path()));
+                            }
                         }
                     }
                 }
-            }
 
-            let brew_installed = checks::is_brew_installed();
-            let kegworks_installed = checks::is_kegworks_installed();
+                let brew_installed = checks::is_brew_installed();
+                let kegworks_installed = checks::is_kegworks_installed();
 
-            if let Ok(mut lock) = async_state.try_write() {
-                lock.kegs = kegs;
-                lock.brew_installed = Some(brew_installed);
-                lock.kegworks_installed = Some(kegworks_installed);
+                if let Ok(mut lock) = async_state.try_write() {
+                    lock.kegs = kegs;
+                    lock.brew_installed = Some(brew_installed);
+                    lock.kegworks_installed = Some(kegworks_installed);
+                }
             }
         });
     }

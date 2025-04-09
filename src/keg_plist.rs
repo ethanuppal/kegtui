@@ -224,6 +224,14 @@ pub struct KegPlist {
     #[serde(rename = "use start.exe")]
     #[serde(with = "bool_as_int")]
     pub use_start_exe: bool,
+
+    #[serde(rename = "CNC_DDRAW")]
+    #[serde(with = "bool_as_int")]
+    pub cnc_ddraw: bool,
+
+    #[serde(rename = "D9VK")]
+    #[serde(with = "bool_as_int")]
+    pub d9vk: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

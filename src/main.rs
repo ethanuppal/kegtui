@@ -12,13 +12,16 @@
 // You should have received a copy of the GNU General Public License along with
 // this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{env, fs, io, process::Command, thread};
+use std::{
+    borrow::Cow, collections::HashMap, env, fs, io, path::Path,
+    process::Command, thread,
+};
 
 use crate::{
     app::App,
     view::{MenuItem, MenuItemAction, NavContext},
 };
-use app::{spawn_worker, AsyncState};
+use app::{AsyncState, spawn_worker};
 use checks::is_kegworks_installed;
 use color_eyre::Result;
 use view::NavAction;
@@ -30,6 +33,139 @@ pub mod keg_config;
 pub mod keg_plist;
 pub mod view;
 pub mod views;
+
+fn parse_winetricks(output: &str) -> Vec<(Cow<str>, &str)> {
+    let mut list = vec![];
+    for line in output.lines() {
+        if !line.is_empty() {
+            if let Some((lhs, rhs)) = line.split_once(' ') {
+                let lhs = lhs.trim();
+                let rhs = rhs.trim();
+                list.push((
+                    if lhs
+                        .chars()
+                        .all(|c| c == '_' || c.is_ascii_alphanumeric())
+                    {
+                        lhs.into()
+                    } else {
+                        format!("\"{lhs}\"").into()
+                    },
+                    rhs,
+                ));
+            }
+        }
+    }
+    list
+}
+
+pub fn winetricks(app: &mut App, _state: &AsyncState) -> Result<()> {
+    let Some(current_keg) = &app.current_keg else {
+        return Ok(());
+    };
+
+    const KEGWORKS_WINETRICKS_SH: &str = "/tmp/kegworks_winetricks.sh";
+    const KEGWORKS_WINETRICKS_CACHE_TOML: &str =
+        "/tmp/kegworks_winetricks_cache.toml";
+    const KEGWORKS_WINETRICKS_EDITOR_TOML: &str = "/tmp/kegtui_winetricks.toml";
+
+    if !Path::new(KEGWORKS_WINETRICKS_SH).is_file() {
+        eprintln!("┌────────────────────────────┐");
+        eprintln!("│ Fetching latest winetricks │");
+        eprintln!("└────────────────────────────┘");
+        Command::new("curl").args([
+        "https://raw.githubusercontent.com/Kegworks-App/winetricks/refs/heads/kegworks/src/winetricks",
+        "-o",
+            KEGWORKS_WINETRICKS_SH
+    ]).status()?;
+    }
+
+    if let Ok(winetricks_toml_template) =
+        fs::read_to_string(KEGWORKS_WINETRICKS_CACHE_TOML)
+    {
+        fs::write(KEGWORKS_WINETRICKS_EDITOR_TOML, winetricks_toml_template)?;
+    } else {
+        eprintln!("┌─────────────────────────────┐");
+        eprintln!("│ Loading winetricks apps     │");
+        let apps_list = String::from_utf8(
+            Command::new("/bin/sh")
+                .args([KEGWORKS_WINETRICKS_SH, "apps", "list"])
+                .output()?
+                .stdout,
+        )?;
+        let apps = parse_winetricks(&apps_list);
+
+        eprintln!("│                    dlls     │");
+        let dlls_list = String::from_utf8(
+            Command::new("/bin/sh")
+                .args([KEGWORKS_WINETRICKS_SH, "dlls", "list"])
+                .output()?
+                .stdout,
+        )?;
+        let dlls = parse_winetricks(&dlls_list);
+
+        eprintln!("│                    fonts    │");
+        let fonts_list = String::from_utf8(
+            Command::new("/bin/sh")
+                .args([KEGWORKS_WINETRICKS_SH, "fonts", "list"])
+                .output()?
+                .stdout,
+        )?;
+        let fonts = parse_winetricks(&fonts_list);
+
+        eprintln!("│                    settings │");
+        eprintln!("└─────────────────────────────┘");
+        let settings_list = String::from_utf8(
+            Command::new("/bin/sh")
+                .args([KEGWORKS_WINETRICKS_SH, "settings", "list"])
+                .output()?
+                .stdout,
+        )?;
+        let settings = parse_winetricks(&settings_list);
+
+        let mut winetricks_toml =
+            String::from("# Uncomment each winetrick to install\n\n");
+        for (app, description) in apps {
+            winetricks_toml
+                .push_str(&format!("# app.{app} = \"{description}\"\n"));
+        }
+        for (dll, description) in dlls {
+            winetricks_toml
+                .push_str(&format!("# dll.{dll} = \"{description}\"\n"));
+        }
+        for (font, description) in fonts {
+            winetricks_toml
+                .push_str(&format!("# font.{font} = \"{description}\"\n"));
+        }
+        for (setting, description) in settings {
+            winetricks_toml.push_str(&format!(
+                "# setting.{setting} = \"{description}\"\n"
+            ));
+        }
+        fs::write(KEGWORKS_WINETRICKS_CACHE_TOML, &winetricks_toml)?;
+        fs::write(KEGWORKS_WINETRICKS_EDITOR_TOML, winetricks_toml)?;
+    }
+    let editor = env::var("EDITOR").unwrap_or("vim".into());
+    Command::new(editor)
+        .arg(KEGWORKS_WINETRICKS_EDITOR_TOML)
+        .status()?;
+    let selected_winetricks: HashMap<String, HashMap<String, String>> =
+        toml::from_str(&fs::read_to_string(KEGWORKS_WINETRICKS_EDITOR_TOML)?)?;
+    let selected_winetricks =
+        selected_winetricks.iter().fold(vec![], |mut list, map| {
+            list.extend(map.1.keys());
+            list
+        });
+    let mut console = Command::new("open")
+        .arg(current_keg.log_directory.join("Winetricks.log"))
+        .spawn()?;
+    Command::new(&current_keg.wineskin_launcher)
+        .arg("WSS-winetricks")
+        .args(selected_winetricks)
+        .status()?;
+    console.kill()?;
+
+    Ok(())
+}
 
 pub fn open_c_drive(app: &mut App, _state: &AsyncState) -> Result<()> {
     let Some(current_keg) = &app.current_keg else {
@@ -114,13 +250,13 @@ fn main() -> Result<()> {
         ],
     );
 
-    let keg_nav = context.nav(
+    context.nav(
         "keg",
         [
             MenuItem::new("Back", MenuItemAction::NavAction(NavAction::Pop)),
             MenuItem::new("Launch", MenuItemAction::External(launch_keg))
                 .default(),
-            //MenuItem::new("Winetricks", todo!()),
+            MenuItem::new("Winetricks", MenuItemAction::External(winetricks)),
             MenuItem::new(
                 "Open C Drive",
                 MenuItemAction::External(open_c_drive),
