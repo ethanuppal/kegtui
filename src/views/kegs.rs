@@ -39,7 +39,13 @@ impl View for KegsView {
                 .kegs
                 .iter()
                 .cloned()
-                .map(|keg| ListItem::new(Span::from(keg.name)))
+                .map(|keg| {
+                    ListItem::new(Span::from(format!(
+                        "{} (under {})",
+                        keg.name,
+                        keg.enclosing_location.display()
+                    )))
+                })
                 .collect();
 
             let list_area = Rect {

@@ -22,6 +22,7 @@ use crate::keg_plist::KegPlist;
 #[derive(Debug, Clone)]
 pub struct Keg {
     pub name: String,
+    pub enclosing_location: PathBuf,
     pub config_file: PathBuf,
     pub wineskin_launcher: OsString,
     pub c_drive: PathBuf,
@@ -45,6 +46,10 @@ impl Keg {
                 .expect("Missing Keg name")
                 .to_string_lossy()
                 .to_string(),
+            enclosing_location: path
+                .parent()
+                .expect("Missing Keg name")
+                .to_path_buf(),
             config_file: path.join("Contents/Info.plist"),
             c_drive: path.join("Contents/drive_c"),
             wineskin_launcher: path
