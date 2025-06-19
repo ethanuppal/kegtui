@@ -223,6 +223,7 @@ pub struct KegPlist {
 
     #[serde(rename = "use start.exe")]
     #[serde(with = "bool_as_int")]
+    #[serde(default)]
     pub use_start_exe: bool,
 
     #[serde(rename = "CNC_DDRAW")]
