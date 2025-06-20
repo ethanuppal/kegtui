@@ -532,6 +532,8 @@ pub fn spawn_worker() -> (Arc<RwLock<AsyncState>>, TerminateWorkerGuard) {
                 lock.brew_installed = Some(brew_installed);
                 lock.kegworks_installed = Some(kegworks_installed);
             }
+
+            thread::sleep(Duration::from_secs(1));
         });
     }
 

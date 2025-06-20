@@ -21,7 +21,7 @@ use crate::{
     app::App,
     view::{MenuItem, MenuItemAction, NavContext},
 };
-use app::{AsyncState, spawn_worker};
+use app::{spawn_worker, AsyncState};
 use checks::is_kegworks_installed;
 use color_eyre::Result;
 use view::NavAction;
@@ -122,8 +122,9 @@ pub fn winetricks(app: &mut App, _state: &AsyncState) -> Result<()> {
         )?;
         let settings = parse_winetricks(&settings_list);
 
-        let mut winetricks_toml =
-            String::from("# Uncomment each winetrick to install\n\n");
+        let mut winetricks_toml = String::from(
+            "# Uncomment each winetrick to install\n# Save and quit your editor to select\n\n",
+        );
         for (app, description) in apps {
             winetricks_toml
                 .push_str(&format!("# app.{app} = \"{description}\"\n"));
@@ -155,14 +156,16 @@ pub fn winetricks(app: &mut App, _state: &AsyncState) -> Result<()> {
             list.extend(map.1.keys());
             list
         });
-    let mut console = Command::new("open")
-        .arg(current_keg.log_directory.join("Winetricks.log"))
-        .spawn()?;
-    Command::new(&current_keg.wineskin_launcher)
-        .arg("WSS-winetricks")
-        .args(selected_winetricks)
-        .status()?;
-    console.kill()?;
+    if !selected_winetricks.is_empty() {
+        let mut console = Command::new("open")
+            .arg(current_keg.log_directory.join("Winetricks.log"))
+            .spawn()?;
+        Command::new(&current_keg.wineskin_launcher)
+            .arg("WSS-winetricks")
+            .args(selected_winetricks)
+            .status()?;
+        console.kill()?;
+    }
 
     Ok(())
 }

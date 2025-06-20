@@ -2,7 +2,7 @@
 name = "kegtui"
 authors = ["Ethan Uppal"]
 description = "Run Windows games/apps on macOS through wine"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "GPL-3.0-only"
 readme = "README.md"
