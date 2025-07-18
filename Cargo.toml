@@ -36,7 +36,7 @@ iced.workspace = true
 iced_term.workspace = true
 core-foundation.workspace = true
 
-[package.metadata.bundle]
+[package.metadata.bundle.bin.wrapper]
 name = "kegtui"
 identifier = "com.ethanuppal.kegtui"
 resources = ["target/x86_64-apple-darwin/release/kegtui"]
