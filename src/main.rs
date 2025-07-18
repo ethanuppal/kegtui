@@ -4,27 +4,28 @@ use std::{fs, path::PathBuf, process::Command};
 
 use font_kit::source::SystemSource;
 use iced::{
-    Font, Length, Size, Subscription, Task, Theme,
     advanced::graphics::core::Element,
     alignment::Horizontal,
     font::Family,
     widget::{button, column, container, text},
     window::{self, Settings},
+    Color, Font, Length, Size, Subscription, Task, Theme,
 };
 use iced_term::{ColorPalette, TerminalView};
 
 fn main() -> iced::Result {
     iced::application(App::title, App::update, App::view)
         .antialiasing(false)
-        .window_size(Size {
-            width: 1280.0,
-            height: 720.0,
-        })
+        // .window_size(Size {
+        //     width: 1400.0,
+        //     height: 720.0,
+        // })
         .window(Settings {
             min_size: Some(Size {
-                width: 1280.0,
-                height: 720.0,
+                width: 640.0,
+                height: 480.0,
             }),
+
             ..Default::default()
         })
         .subscription(App::subscription)
@@ -198,7 +199,7 @@ impl App {
         container(
         column![
             container(
-                text("Note: this has been ported directly from a terminal app into a GUI app, so there may be some issues. Remember to click on the app to focus it if needed. Vim keybinds work.")
+                text("Note: This has been ported directly from a terminal app into a GUI app, so there may be issues. Click on the app to focus if keys don't work. Vim keybinds work. Keybinds won't show if window too small.")
                     .width(Length::Fill)
                     .align_x(Horizontal::Left)
             )

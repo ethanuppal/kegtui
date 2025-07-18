@@ -20,16 +20,16 @@ use std::{
 };
 
 use crossterm::{
-    ExecutableCommand,
     event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     terminal::{
-        EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode,
-        enable_raw_mode,
+        disable_raw_mode, enable_raw_mode, EnterAlternateScreen,
+        LeaveAlternateScreen,
     },
+    ExecutableCommand,
 };
 use ratatui::{
-    DefaultTerminal,
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Padding},
+    DefaultTerminal,
 };
 use symbols::line::VERTICAL;
 
@@ -208,23 +208,26 @@ impl<'a> App<'a> {
             let modal_width = table_width + 4;
             let modal_height = table_height + 4;
 
-            let modal_area = Rect {
-                x: area.x + (area.width.saturating_sub(modal_width)) / 2,
-                y: area.y + (area.height.saturating_sub(modal_height)) / 2,
-                width: modal_width,
-                height: modal_height,
-            };
+            if !(modal_width > area.width - 3 || modal_height > area.height - 3)
+            {
+                let modal_area = Rect {
+                    x: area.x + (area.width.saturating_sub(modal_width)) / 2,
+                    y: area.y + (area.height.saturating_sub(modal_height)) / 2,
+                    width: modal_width,
+                    height: modal_height,
+                };
 
-            frame.render_widget(Clear, modal_area);
+                frame.render_widget(Clear, modal_area);
 
-            let modal_block = Block::default()
-                .title(Span::from(" Keybinds ").into_centered_line())
-                .borders(Borders::ALL)
-                .padding(Padding::uniform(1));
-            let inner_modal_area = modal_block.inner(modal_area);
+                let modal_block = Block::default()
+                    .title(Span::from(" Keybinds ").into_centered_line())
+                    .borders(Borders::ALL)
+                    .padding(Padding::uniform(1));
+                let inner_modal_area = modal_block.inner(modal_area);
 
-            frame.render_widget(modal_block, modal_area);
-            frame.render_widget(modal_table, inner_modal_area);
+                frame.render_widget(modal_block, modal_area);
+                frame.render_widget(modal_table, inner_modal_area);
+            }
         }
 
         Ok(())
@@ -497,46 +500,43 @@ pub fn spawn_worker() -> (Arc<RwLock<AsyncState>>, TerminateWorkerGuard) {
 
     {
         let async_state = async_state.clone();
-        thread::spawn(move || {
-            loop {
-                if quit_rx.try_recv().is_ok() {
-                    break;
-                }
-                let mut kegs = vec![];
-                let home_directory = env::var("HOME")
-                    .expect("User missing home directory env variable");
-                for enclosing_location in [
-                    "/Applications",
-                    "~/Applications/",
-                    "~/Applications/Kegworks/",
-                ] {
-                    let fixed_enclosing_location =
-                        enclosing_location.replace("~", &home_directory);
-                    if let Ok(read_dir) = fs::read_dir(fixed_enclosing_location)
-                    {
-                        for entry in read_dir.flatten() {
-                            if entry
-                                .path()
-                                .join("Contents/KegworksConfig.app")
-                                .exists()
-                            {
-                                kegs.push(Keg::from_path(&entry.path()));
-                            }
+        thread::spawn(move || loop {
+            if quit_rx.try_recv().is_ok() {
+                break;
+            }
+            let mut kegs = vec![];
+            let home_directory = env::var("HOME")
+                .expect("User missing home directory env variable");
+            for enclosing_location in [
+                "/Applications",
+                "~/Applications/",
+                "~/Applications/Kegworks/",
+            ] {
+                let fixed_enclosing_location =
+                    enclosing_location.replace("~", &home_directory);
+                if let Ok(read_dir) = fs::read_dir(fixed_enclosing_location) {
+                    for entry in read_dir.flatten() {
+                        if entry
+                            .path()
+                            .join("Contents/KegworksConfig.app")
+                            .exists()
+                        {
+                            kegs.push(Keg::from_path(&entry.path()));
                         }
                     }
                 }
-
-                let brew_installed = checks::is_brew_installed();
-                let kegworks_installed = checks::is_kegworks_installed();
-
-                if let Ok(mut lock) = async_state.try_write() {
-                    lock.kegs = kegs;
-                    lock.brew_installed = Some(brew_installed);
-                    lock.kegworks_installed = Some(kegworks_installed);
-                }
-
-                thread::sleep(Duration::from_secs(1));
             }
+
+            let brew_installed = checks::is_brew_installed();
+            let kegworks_installed = checks::is_kegworks_installed();
+
+            if let Ok(mut lock) = async_state.try_write() {
+                lock.kegs = kegs;
+                lock.brew_installed = Some(brew_installed);
+                lock.kegworks_installed = Some(kegworks_installed);
+            }
+
+            thread::sleep(Duration::from_secs(1));
         });
     }
 
