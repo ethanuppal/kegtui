@@ -1,0 +1,33 @@
+name: Build App Bundle
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build_mac:
+    name: Build macOS .app
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust + macOS target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+
+      # - uses: cargo-bins/cargo-binstall@main
+      # - run: cargo binstall -y cargo-bundle
+      - run: cargo install cargo-bundle
+
+      - name: Build kegtui
+        run: cargo build --release --package kegtui --target x86_64-apple-darwin
+
+      - name: Build and bundle
+        run: cargo bundle --release --bin wrapper --format osx --target x86_64-apple-darwin
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kegtui.app
+          path: target/x86_64-apple-darwin/release/bundle/osx/kegtui.app
