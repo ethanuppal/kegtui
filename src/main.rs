@@ -4,12 +4,12 @@ use std::{fs, path::PathBuf, process::Command};
 
 use font_kit::source::SystemSource;
 use iced::{
+    Color, Font, Length, Size, Subscription, Task, Theme,
     advanced::graphics::core::Element,
     alignment::Horizontal,
     font::Family,
     widget::{button, column, container, text},
     window::{self, Settings},
-    Color, Font, Length, Size, Subscription, Task, Theme,
 };
 use iced_term::{ColorPalette, TerminalView};
 

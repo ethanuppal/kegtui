@@ -30,12 +30,30 @@ impl View for KegsView {
         area: Rect,
         is_focused: bool,
     ) -> Result<()> {
-        let keg_title =
-            Paragraph::new("Select a Keg (kegs are searched under /Applications/, ~/Applications/, and ~/Applications/Kegworks/):").wrap(Wrap { trim: false });
-        frame.render_widget(keg_title, Rect { height: 1, ..area });
+        let text = "Select a Keg (kegs are searched under /Applications/, ~/Applications/, and ~/Applications/Kegworks/):";
+        let wrapped = textwrap::wrap(&text, area.width as usize);
+        let para_height = wrapped.len().max(1) as u16; // number of lines
+
+        let title_para = Paragraph::new(text).wrap(Wrap { trim: false });
+        frame.render_widget(
+            title_para,
+            Rect {
+                x: area.x,
+                y: area.y,
+                width: area.width,
+                height: para_height,
+            },
+        );
+
+        let list_area = Rect {
+            x: area.x,
+            y: area.y + para_height,
+            width: area.width,
+            height: area.height.saturating_sub(para_height),
+        };
 
         if !state.kegs.is_empty() {
-            let keg_items: Vec<ListItem> = state
+            let keg_items = state
                 .kegs
                 .iter()
                 .cloned()
@@ -46,28 +64,18 @@ impl View for KegsView {
                         keg.enclosing_location.display()
                     )))
                 })
-                .collect();
+                .collect::<Vec<_>>();
 
-            let list_area = Rect {
-                x: area.x,
-                y: area.y + 1,
-                width: area.width,
-                height: area.height.saturating_sub(1),
-            };
-
-            let keg_selector_list = List::new(keg_items)
+            let mut list_state = ListState::default();
+            list_state.select(Some(app.interaction_state()));
+            let list = List::new(keg_items)
                 .highlight_style(if is_focused {
                     SELECTED_FOCUSED_STYLE
                 } else {
                     SELECTED_UNFOCUSED_STYLE
                 })
                 .highlight_symbol(">> ");
-            frame.render_stateful_widget(
-                keg_selector_list,
-                list_area,
-                &mut ListState::default()
-                    .with_selected(Some(app.interaction_state())),
-            );
+            frame.render_stateful_widget(list, list_area, &mut list_state);
         }
 
         Ok(())
