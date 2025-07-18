@@ -8,6 +8,8 @@ jobs:
   build_mac:
     name: Build macOS .app
     runs-on: macos-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -33,6 +35,20 @@ jobs:
           cp -r target/x86_64-apple-darwin/release/bundle/osx/*.app dmg_contents/
           ln -s /Applications dmg_contents/Applications
           hdiutil create -volname "kegtui" -srcfolder dmg_contents -ov -format UDZO kegtui.dmg
+
+      - name: Get commit hash
+        id: commit
+        run: echo "hash=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: dev-${{ steps.commit.outputs.hash }}
+          name: dev-${{ steps.commit.outputs.hash }}
+          files: kegtui.dmg
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: actions/upload-artifact@v4
         with:
           name: kegtui
