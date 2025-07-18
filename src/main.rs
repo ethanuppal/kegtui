@@ -1,13 +1,15 @@
 // Code from https://github.com/Harzu/iced_term
 
-use std::path::PathBuf;
+use std::{fs, path::PathBuf, process::Command};
 
+use font_kit::source::SystemSource;
 use iced::{
+    Font, Length, Size, Subscription, Task, Theme,
     advanced::graphics::core::Element,
     alignment::Horizontal,
     font::Family,
-    widget::{column, container, text},
-    window, Font, Length, Size, Subscription, Task, Theme,
+    widget::{button, column, container, text},
+    window::{self, Settings},
 };
 use iced_term::{ColorPalette, TerminalView};
 
@@ -17,6 +19,13 @@ fn main() -> iced::Result {
         .window_size(Size {
             width: 1280.0,
             height: 720.0,
+        })
+        .window(Settings {
+            min_size: Some(Size {
+                width: 1280.0,
+                height: 720.0,
+            }),
+            ..Default::default()
         })
         .subscription(App::subscription)
         .font(
@@ -29,10 +38,13 @@ fn main() -> iced::Result {
 #[derive(Debug, Clone)]
 pub enum Event {
     Terminal(iced_term::Event),
+    DebugEditFont,
 }
 
 struct App {
     title: String,
+    fallback_font: &'static str,
+    config_file: Option<PathBuf>,
     term: iced_term::Terminal,
 }
 
@@ -56,11 +68,34 @@ fn resources_root() -> Option<PathBuf> {
 
 const TUI_EXECUTABLE: &str = "target/x86_64-apple-darwin/release/kegtui";
 
+fn font_exists(font_name: &str) -> bool {
+    let source = SystemSource::new();
+    source.select_family_by_name(font_name).is_ok()
+}
+
 impl App {
     fn new() -> (Self, Task<Event>) {
         let mut executable_path = resources_root().unwrap_or_default();
         executable_path.push(TUI_EXECUTABLE);
 
+        let fallback_font = if font_exists("Hack Nerd Font Mono") {
+            "Hack Nerd Font Mono"
+        } else {
+            "Menlo"
+        };
+        let config_file =
+            dirs::data_local_dir().and_then(|mut config_directory| {
+                config_directory.push("com.ethanuppal.kegtui");
+                fs::create_dir_all(&config_directory).ok()?;
+                config_directory.push("font.txt");
+                Some(config_directory)
+            });
+
+        let terminal_font = config_file
+            .as_ref()
+            .and_then(|config_file| fs::read_to_string(config_file).ok())
+            .unwrap_or_else(|| fallback_font.into());
+        let leaked: &'static str = Box::leak(Box::new(terminal_font.clone()));
         let oxocarbon = ColorPalette {
             foreground: String::from("#dde1e6"),
             background: String::from("#161616"),
@@ -97,7 +132,7 @@ impl App {
             font: iced_term::settings::FontSettings {
                 size: 24.0,
                 font_type: Font {
-                    family: Family::Name("Hack Nerd Font Mono"),
+                    family: Family::Name(leaked),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -114,6 +149,8 @@ impl App {
         (
             Self {
                 title: String::from("kegtui"),
+                fallback_font,
+                config_file,
                 term: iced_term::Terminal::new(term_id, term_settings),
             },
             Task::none(),
@@ -145,6 +182,15 @@ impl App {
                     _ => Task::none(),
                 }
             }
+            Event::DebugEditFont => {
+                if let Some(config_file) = &self.config_file {
+                    if !config_file.exists() {
+                        let _ = fs::write(config_file, self.fallback_font);
+                    }
+                    Command::new("open").arg(&config_file).spawn().ok();
+                }
+                Task::none()
+            }
         }
     }
 
@@ -157,7 +203,14 @@ impl App {
                     .align_x(Horizontal::Left)
             )
             .padding(4),
-            TerminalView::show(&self.term).map(Event::Terminal)
+            TerminalView::show(&self.term).map(Event::Terminal),
+            container(
+                button("Debug: Edit font (reopen app after edit)")
+                    .on_press(Event::DebugEditFont)
+            )
+            .width(Length::Fill)
+            .align_x(Horizontal::Center)
+            .padding(4)
         ]
     )
     .width(Length::Fill)

@@ -24,6 +24,8 @@ toml = "0.9.2"
 iced = "0.13.1"
 iced_term = "0.5.1"
 core-foundation = "0.10.1"
+dirs = "6.0.0"
+font-kit = "0.14.3"
 
 [package]
 name = "wrapper"
@@ -35,6 +37,8 @@ edition.workspace = true
 iced.workspace = true
 iced_term.workspace = true
 core-foundation.workspace = true
+dirs.workspace = true
+font-kit.workspace = true
 
 [package.metadata.bundle.bin.wrapper]
 name = "kegtui"
