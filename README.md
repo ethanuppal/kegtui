@@ -6,6 +6,16 @@ Terminal interface for [Kegworks][kegworks].
 
 [![macOS Download](https://img.shields.io/badge/macOS-Download-green?logo=apple&logoColor=white)](https://nightly.link/ethanuppal/kegtui/workflows/build.yaml/main/kegtui.zip)
 
+### First-time setup
+
+After clicking on this button and downloading, you'll have to open it by right-clicking on it from Finder:
+
+![Right click on the app and then click Open](./images/how-to-open-first-time.png)
+
+Subsequent opens won't require this step.
+
+If you drag the app into your Applications folder, you can open it via Spotlight.
+
 ## Install (for development)
 ```
 git clone https://github.com/ethanuppal/kegtui
