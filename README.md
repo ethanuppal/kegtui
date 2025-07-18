@@ -2,8 +2,11 @@
 
 Terminal interface for [Kegworks][kegworks].
 
-## Install
+## Download
 
+[![macOS Download](https://img.shields.io/badge/macOS-Download-green?logo=apple&logoColor=white)](https://nightly.link/ethanuppal/kegtui/workflows/build.yaml/main/kegtui.zip)
+
+## Install (for development)
 ```
 git clone https://github.com/ethanuppal/kegtui
 cd kegtui
