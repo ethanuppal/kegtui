@@ -3,12 +3,11 @@
 use std::path::PathBuf;
 
 use iced::{
-    Font, Length, Size, Subscription, Task, Theme,
     advanced::graphics::core::Element,
     alignment::Horizontal,
     font::Family,
     widget::{column, container, text},
-    window,
+    window, Font, Length, Size, Subscription, Task, Theme,
 };
 use iced_term::{ColorPalette, TerminalView};
 
@@ -153,7 +152,7 @@ impl App {
         container(
         column![
             container(
-                text("Note: this has been ported directly from a terminal app into a GUI app, so there may be some issues. Remember to click on the app to focus it if needed.")
+                text("Note: this has been ported directly from a terminal app into a GUI app, so there may be some issues. Remember to click on the app to focus it if needed. Vim keybinds work.")
                     .width(Length::Fill)
                     .align_x(Horizontal::Left)
             )
