@@ -6,6 +6,9 @@ Terminal interface for [Kegworks][kegworks].
 
 [![macOS Download](https://img.shields.io/badge/macOS-Download-green?logo=apple&logoColor=white)](https://nightly.link/ethanuppal/kegtui/workflows/build.yaml/main/kegtui.zip)
 
+> [!CAUTION]
+> If the link above is broken, head over to the [Releases](https://github.com/ethanuppal/kegtui/releases) view and download the `.dmg` from the latest release there.
+
 ### First-time setup
 
 After clicking on this button and downloading, you'll have to open it by right-clicking on it from Finder:
