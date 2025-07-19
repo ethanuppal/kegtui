@@ -32,24 +32,23 @@ impl View for KegsView {
     ) -> Result<()> {
         let text = "Select a Keg (kegs are searched under /Applications/, ~/Applications/, and ~/Applications/Kegworks/):";
         let wrapped = textwrap::wrap(&text, area.width as usize);
-        let para_height = wrapped.len().max(1) as u16; // number of lines
 
-        let title_para = Paragraph::new(text).wrap(Wrap { trim: false });
+        let title_paragraph = Paragraph::new(text).wrap(Wrap { trim: false });
         frame.render_widget(
-            title_para,
+            title_paragraph,
             Rect {
                 x: area.x,
                 y: area.y,
                 width: area.width,
-                height: para_height,
+                height: wrapped.len() as u16,
             },
         );
 
         let list_area = Rect {
             x: area.x,
-            y: area.y + para_height,
+            y: area.y + (wrapped.len() as u16),
             width: area.width,
-            height: area.height.saturating_sub(para_height),
+            height: area.height.saturating_sub(wrapped.len() as u16),
         };
 
         if !state.kegs.is_empty() {
