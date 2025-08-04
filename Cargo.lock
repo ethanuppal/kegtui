@@ -1954,8 +1954,7 @@ dependencies = [
 [[package]]
 name = "iced_term"
 version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "192048354e5e353096fbf4cac9367ffe653371bebb7d067ea67cc2d7fc4f5d03"
+source = "git+https://github.com/Harzu/iced_term.git?rev=20669c290765dd18b134ea0e3479beac4b6987e6#20669c290765dd18b134ea0e3479beac4b6987e6"
 dependencies = [
  "alacritty_terminal",
  "anyhow",

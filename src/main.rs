@@ -4,7 +4,7 @@ use std::{fs, path::PathBuf, process::Command};
 
 use font_kit::source::SystemSource;
 use iced::{
-    Color, Font, Length, Size, Subscription, Task, Theme,
+    Font, Length, Size, Subscription, Task, Theme,
     advanced::graphics::core::Element,
     alignment::Horizontal,
     font::Family,
@@ -142,7 +142,7 @@ impl App {
                 color_pallete: Box::new(oxocarbon),
             },
             backend: iced_term::settings::BackendSettings {
-                shell: executable_path.to_string_lossy().to_string(),
+                program: executable_path.to_string_lossy().to_string(),
                 ..Default::default()
             },
         };
