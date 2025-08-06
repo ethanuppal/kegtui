@@ -228,6 +228,7 @@ pub struct KegPlist {
 
     #[serde(rename = "CNC_DDRAW")]
     #[serde(with = "bool_as_int")]
+    #[serde(default)]
     pub cnc_ddraw: bool,
 
     #[serde(rename = "D9VK")]
