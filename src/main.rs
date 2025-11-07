@@ -152,7 +152,7 @@ impl App {
                 title: String::from("kegtui"),
                 fallback_font,
                 config_file,
-                term: iced_term::Terminal::new(term_id, term_settings),
+                term: iced_term::Terminal::new(term_id, term_settings).expect("Failed to create terminal"),
             },
             Task::none(),
         )
@@ -163,16 +163,14 @@ impl App {
     }
 
     fn subscription(&self) -> Subscription<Event> {
-        let term_subscription = iced_term::Subscription::new(self.term.id);
-        let term_event_stream = term_subscription.event_stream();
-        Subscription::run_with_id(self.term.id, term_event_stream)
+        Subscription::run_with_id(self.term.id, self.term.subscription())
             .map(Event::Terminal)
     }
 
     fn update(&mut self, event: Event) -> Task<Event> {
         match event {
-            Event::Terminal(iced_term::Event::CommandReceived(_, cmd)) => {
-                match self.term.update(cmd) {
+            Event::Terminal(iced_term::Event::BackendCall(_, cmd)) => {
+                match self.term.handle(iced_term::Command::ProxyToBackend(cmd)) {
                     iced_term::actions::Action::Shutdown => {
                         window::get_latest().and_then(window::close)
                     }
