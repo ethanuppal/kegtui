@@ -25,6 +25,10 @@ If you drag the app into your Applications folder, you can open it via Spotlight
 > xattr -d com.apple.quarantine <path/to/kegtui.app>
 > ```
 
+#### For Advanced Users
+
+You can clone and `just install`.
+
 ### Setup
 
 I aim to automate steps 2 and 3, but for now they have to be done manually.
@@ -54,7 +58,7 @@ Press `?` anywhere to view keybinds.
 See [the definition of the config file](./core/src/app_config.rs).
 It is located at `$XDG_CONFIG_HOME/kegtui.toml`.
 
-## Support [GCenx](https://github.com/Gcenx).
+## Support [GCenx](https://github.com/Gcenx) / [Kegworks][kegworks].
 
 Wine on macOS is effecivtively made possible by him.
 Please support him in any way possible!
