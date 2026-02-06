@@ -1,13 +1,13 @@
 # kegtui
 
+> [!WARNING]
+> kegtui does **NOT** create wrappers or claim legal rights to them. kegtui is **NOT** a substitute for using [Kegworks][kegworks] to create wrappers.
+
 Terminal interface for [Kegworks][kegworks].
 
 ## Download
 
-[![macOS Download](https://img.shields.io/badge/macOS-Download-green?logo=apple&logoColor=white)](https://nightly.link/ethanuppal/kegtui/workflows/build.yaml/main/kegtui.zip)
-
-> [!CAUTION]
-> If the link above is broken, head over to the [Releases](https://github.com/ethanuppal/kegtui/releases) view and download the `.dmg` from the latest release there.
+[![macOS Download](https://img.shields.io/badge/macOS-Download-green?logo=apple&logoColor=white)](https://github.com/ethanuppal/kegtui/releases)
 
 ### First-time setup
 
