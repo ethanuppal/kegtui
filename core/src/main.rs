@@ -14,11 +14,12 @@
 
 use std::{
     borrow::Cow, collections::HashMap, env, fs, io, path::Path,
-    process::Command, thread,
+    process::Command, sync::Arc, thread,
 };
 
 use crate::{
     app::App,
+    app_config::{AppConfig, app_config_file_path},
     view::{MenuItem, MenuItemAction, NavContext},
 };
 use app::{AsyncState, spawn_worker};
@@ -27,6 +28,7 @@ use color_eyre::Result;
 use view::NavAction;
 
 pub mod app;
+pub mod app_config;
 pub mod checks;
 pub mod keg;
 pub mod keg_config;
@@ -273,11 +275,43 @@ fn main() -> Result<()> {
         ],
     );
 
-    let (async_state, _terminate_worker_guard) = spawn_worker();
+    let app_config_file_path = app_config_file_path();
+    if !app_config_file_path.try_exists().expect(&format!(
+        "Failed to check existence of {}",
+        app_config_file_path.display()
+    )) {
+        let parent_directory = app_config_file_path
+            .parent()
+            .expect("app_config_file_path should be a full path to the file");
+        fs::create_dir_all(parent_directory).expect(&format!(
+            "Failed to create directory {}",
+            parent_directory.display()
+        ));
+        fs::write(&app_config_file_path, "").expect(&format!(
+            "Failed to create empty config file at {}",
+            app_config_file_path.display()
+        ));
+    }
+    let app_config_file_contents = fs::read_to_string(&app_config_file_path)
+        .expect(&format!(
+            "Failed to read config file {} as string",
+            app_config_file_path.display()
+        ));
+    let app_config = Arc::new(
+        toml::from_str::<AppConfig>(&app_config_file_contents).expect(
+            &format!(
+                "Failed to parse config file {}",
+                app_config_file_path.display()
+            ),
+        ),
+    );
+
+    let (async_state, _terminate_worker_guard) =
+        spawn_worker(app_config.clone());
 
     color_eyre::install()?;
     let mut terminal = ratatui::init();
-    let app_result = App::default().run(
+    let app_result = App::new(&app_config).run(
         &mut context,
         if is_kegworks_installed() {
             main_nav

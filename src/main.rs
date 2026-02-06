@@ -152,7 +152,8 @@ impl App {
                 title: String::from("kegtui"),
                 fallback_font,
                 config_file,
-                term: iced_term::Terminal::new(term_id, term_settings).expect("Failed to create terminal"),
+                term: iced_term::Terminal::new(term_id, term_settings)
+                    .expect("Failed to create terminal"),
             },
             Task::none(),
         )
@@ -170,7 +171,8 @@ impl App {
     fn update(&mut self, event: Event) -> Task<Event> {
         match event {
             Event::Terminal(iced_term::Event::BackendCall(_, cmd)) => {
-                match self.term.handle(iced_term::Command::ProxyToBackend(cmd)) {
+                match self.term.handle(iced_term::Command::ProxyToBackend(cmd))
+                {
                     iced_term::actions::Action::Shutdown => {
                         window::get_latest().and_then(window::close)
                     }

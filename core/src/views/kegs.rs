@@ -21,6 +21,19 @@ use crate::{
 
 pub struct KegsView;
 
+fn oxford_comma(items: Vec<String>, if_empty: impl Into<String>) -> String {
+    match items.len() {
+        0 => if_empty.into(),
+        1 => items.join(""),
+        2 => format!("{} and {}", items[0], items[1]),
+        _ => format!(
+            "{}, and {}",
+            items[..items.len() - 1].join(", "),
+            items[items.len() - 1]
+        ),
+    }
+}
+
 impl View for KegsView {
     fn draw_content(
         &self,
@@ -30,10 +43,21 @@ impl View for KegsView {
         area: Rect,
         is_focused: bool,
     ) -> Result<()> {
-        let text = "Select a Keg (kegs are searched under /Applications/, ~/Applications/, and ~/Applications/Kegworks/):";
+        let search_locations = oxford_comma(
+            app.config
+                .wrapper_search_paths
+                .iter()
+                .map(|path| path.to_string_lossy().to_string())
+                .collect(),
+            "nowhere (you'll need to specify paths in the config file)",
+        );
+        let text = format!(
+            "Select a Keg (kegs are searched under {search_locations}):"
+        );
         let wrapped = textwrap::wrap(&text, area.width as usize);
 
-        let title_paragraph = Paragraph::new(text).wrap(Wrap { trim: false });
+        let title_paragraph =
+            Paragraph::new(text.clone()).wrap(Wrap { trim: false });
         frame.render_widget(
             title_paragraph,
             Rect {

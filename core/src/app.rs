@@ -34,6 +34,7 @@ use ratatui::{
 use symbols::line::VERTICAL;
 
 use crate::{
+    app_config::AppConfig,
     checks,
     keg::{CurrentKeg, Keg},
     view::prelude::*,
@@ -111,7 +112,6 @@ enum Focus {
     Content,
 }
 
-#[derive(Default)]
 pub struct App<'a> {
     // TODO: separate this state out of App into something like a NavController
     exit: bool,
@@ -121,10 +121,24 @@ pub struct App<'a> {
     clickables_state: usize,
     // ENDTODO
     pub current_keg: Option<CurrentKeg>,
+    pub config: &'a AppConfig,
     show_keybinds_modal: bool,
 }
 
 impl<'a> App<'a> {
+    pub fn new(config: &'a AppConfig) -> Self {
+        Self {
+            exit: Default::default(),
+            focus: Default::default(),
+            menu_state: Default::default(),
+            current_view: Default::default(),
+            clickables_state: Default::default(),
+            current_keg: Default::default(),
+            config,
+            show_keybinds_modal: Default::default(),
+        }
+    }
+
     pub fn interaction_state(&self) -> usize {
         self.clickables_state
     }
@@ -493,7 +507,9 @@ impl Drop for TerminateWorkerGuard {
     }
 }
 
-pub fn spawn_worker() -> (Arc<RwLock<AsyncState>>, TerminateWorkerGuard) {
+pub fn spawn_worker(
+    config: Arc<AppConfig>,
+) -> (Arc<RwLock<AsyncState>>, TerminateWorkerGuard) {
     let async_state = Arc::new(RwLock::new(AsyncState::default()));
 
     let (quit_tx, quit_rx) = sync::mpsc::channel();
@@ -508,13 +524,10 @@ pub fn spawn_worker() -> (Arc<RwLock<AsyncState>>, TerminateWorkerGuard) {
                 let mut kegs = vec![];
                 let home_directory = env::var("HOME")
                     .expect("User missing home directory env variable");
-                for enclosing_location in [
-                    "/Applications",
-                    "~/Applications/",
-                    "~/Applications/Kegworks/",
-                ] {
-                    let fixed_enclosing_location =
-                        enclosing_location.replace("~", &home_directory);
+                for enclosing_location in &config.wrapper_search_paths {
+                    let fixed_enclosing_location = enclosing_location
+                        .to_string_lossy()
+                        .replace("~", &home_directory);
                     if let Ok(read_dir) = fs::read_dir(fixed_enclosing_location)
                     {
                         for entry in read_dir.flatten() {

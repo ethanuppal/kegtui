@@ -37,3 +37,10 @@ create_dmg:
     hdiutil create -volname "kegtui" -srcfolder dmg_contents -ov -format UDZO kegtui.dmg
     rm -rf dmg_contents
     echo "DMG created: kegtui.dmg"
+
+kegtui:
+    cargo run --package kegtui
+
+wrapper:
+    cargo build --release --package kegtui --target x86_64-apple-darwin
+    cargo run --package wrapper
