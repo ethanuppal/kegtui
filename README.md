@@ -49,6 +49,11 @@ cargo install --path .
 
 Press `?` anywhere to view keybinds.
 
+## Config
+
+See [the definition of the config file](./core/src/app_config.rs).
+It is located at `$XDG_CONFIG_HOME/kegtui.toml`.
+
 ## Support [GCenx](https://github.com/Gcenx).
 
 Wine on macOS is effecivtively made possible by him.
