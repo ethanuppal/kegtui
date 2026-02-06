@@ -21,7 +21,7 @@ jobs:
 
       # - uses: cargo-bins/cargo-binstall@main
       # - run: cargo binstall -y cargo-bundle
-      - run: cargo install cargo-bundle
+      - run: cargo install cargo-bundle@0.9.0
 
       - name: Build kegtui
         run: cargo build --release --package kegtui --target x86_64-apple-darwin

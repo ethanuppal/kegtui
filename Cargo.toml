@@ -44,4 +44,4 @@ font-kit.workspace = true
 name = "kegtui"
 identifier = "com.ethanuppal.kegtui"
 resources = ["target/x86_64-apple-darwin/release/kegtui"]
-copyright = "Copyright (C) Ethan Uppal. All rights reserved."
+copyright = "Copyright (C) 2025 Ethan Uppal. All rights reserved."
