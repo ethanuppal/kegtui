@@ -180,7 +180,10 @@ impl App {
 
         self.term.handle(iced_term::Command::ChangeFont(
             iced_term::settings::FontSettings {
-                size: 24.0,
+                size: env_variables
+                    .get("KEGTUI_FONT_SIZE")
+                    .and_then(|value| value.parse().ok())
+                    .unwrap_or(24.0),
                 font_type: Font {
                     family: Family::Name(leaked),
                     ..Default::default()
