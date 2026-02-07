@@ -4,17 +4,19 @@ use std::{collections::HashMap, fs, path::PathBuf, process::Command};
 
 use font_kit::source::SystemSource;
 use iced::{
-    Font, Length, Size, Subscription, Task, Theme,
+    Length, Size, Subscription, Task, Theme,
     advanced::graphics::core::Element,
     alignment::{Horizontal, Vertical},
-    font::Family,
-    widget::{button, column, container, horizontal_space, row, text},
+    font::{Family, Font},
+    padding::horizontal,
+    widget::{button, column, container, row, space, text},
     window::{self, Settings},
 };
 use iced_term::{ColorPalette, TerminalView};
 
 fn main() -> iced::Result {
-    iced::application(App::title, App::update, App::view)
+    iced::application(App::new, App::update, App::view)
+        .title(App::title)
         .antialiasing(false)
         // .window_size(Size {
         //     width: 1400.0,
@@ -33,7 +35,7 @@ fn main() -> iced::Result {
             include_bytes!("../fonts/HackNerdFontMono-Regular.ttf").as_slice(),
         )
         .default_font(Font::with_name("Hack Nerd Font Mono"))
-        .run_with(App::new)
+        .run()
 }
 
 #[derive(Debug, Clone)]
@@ -214,8 +216,7 @@ impl App {
     }
 
     fn subscription(&self) -> Subscription<Event> {
-        Subscription::run_with_id(self.term.id, self.term.subscription())
-            .map(Event::Terminal)
+        self.term.subscription().map(Event::Terminal)
     }
 
     fn update(&mut self, event: Event) -> Task<Event> {
@@ -225,7 +226,7 @@ impl App {
                 {
                     iced_term::actions::Action::Shutdown => {
                         if self.exit_on_terminal_shutdown {
-                            window::get_latest().and_then(window::close)
+                            window::latest().and_then(window::close)
                         } else {
                             Task::none()
                         }
@@ -279,7 +280,7 @@ impl App {
                     container(
                         row![
                             text("Debug Config"),
-                            horizontal_space(),
+                            space::horizontal(),
                             button("Edit font")
                                 .on_press(Event::DebugEditFont),
                             button("Edit env")
