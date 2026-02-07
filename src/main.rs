@@ -51,6 +51,7 @@ struct App {
     env_config_file: Option<PathBuf>,
     term: iced_term::Terminal,
     hide_extra_ui: bool,
+    exit_on_terminal_shutdown: bool,
 }
 
 // https://web.archive.org/web/20250718013155/https://github.com/burtonageo/cargo-bundle/issues/167#issuecomment-3032588931
@@ -155,7 +156,8 @@ impl App {
                 env_config_file,
                 term: iced_term::Terminal::new(term_id, term_settings)
                     .expect("Failed to create terminal"),
-                hide_extra_ui: false,
+                hide_extra_ui: Default::default(),
+                exit_on_terminal_shutdown: Default::default(),
             }
             .refresh_config_owned(),
             Task::none(),
@@ -195,6 +197,11 @@ impl App {
             .get("KEGTUI_HIDE_EXTRA_UI")
             .map(|value| value == "1")
             .unwrap_or(false);
+
+        self.exit_on_terminal_shutdown = !env_variables
+            .get("KEGTUI_EXIT_ON_TERMINAL_SHUTDOWN")
+            .map(|value| value == "0")
+            .unwrap_or(false);
     }
 
     fn refresh_config_owned(mut self) -> Self {
@@ -217,7 +224,11 @@ impl App {
                 match self.term.handle(iced_term::Command::ProxyToBackend(cmd))
                 {
                     iced_term::actions::Action::Shutdown => {
-                        window::get_latest().and_then(window::close)
+                        if self.exit_on_terminal_shutdown {
+                            window::get_latest().and_then(window::close)
+                        } else {
+                            Task::none()
+                        }
                     }
                     iced_term::actions::Action::ChangeTitle(title) => {
                         self.title = title;
