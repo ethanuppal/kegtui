@@ -1,14 +1,14 @@
 // Code from https://github.com/Harzu/iced_term
 
-use std::{fs, path::PathBuf, process::Command};
+use std::{collections::HashMap, fs, path::PathBuf, process::Command};
 
 use font_kit::source::SystemSource;
 use iced::{
     Font, Length, Size, Subscription, Task, Theme,
     advanced::graphics::core::Element,
-    alignment::Horizontal,
+    alignment::{Horizontal, Vertical},
     font::Family,
-    widget::{button, column, container, text},
+    widget::{button, column, container, horizontal_space, row, text},
     window::{self, Settings},
 };
 use iced_term::{ColorPalette, TerminalView};
@@ -40,13 +40,17 @@ fn main() -> iced::Result {
 pub enum Event {
     Terminal(iced_term::Event),
     DebugEditFont,
+    DebugEditEnv,
+    DebugRefreshConfig,
 }
 
 struct App {
     title: String,
     fallback_font: &'static str,
-    config_file: Option<PathBuf>,
+    font_config_file: Option<PathBuf>,
+    env_config_file: Option<PathBuf>,
     term: iced_term::Terminal,
+    hide_extra_ui: bool,
 }
 
 // https://web.archive.org/web/20250718013155/https://github.com/burtonageo/cargo-bundle/issues/167#issuecomment-3032588931
@@ -84,19 +88,22 @@ impl App {
         } else {
             "Menlo"
         };
-        let config_file =
+
+        let font_config_file =
             dirs::data_local_dir().and_then(|mut config_directory| {
                 config_directory.push("com.ethanuppal.kegtui");
                 fs::create_dir_all(&config_directory).ok()?;
                 config_directory.push("font.txt");
                 Some(config_directory)
             });
+        let env_config_file =
+            dirs::data_local_dir().and_then(|mut config_directory| {
+                config_directory.push("com.ethanuppal.kegtui");
+                fs::create_dir_all(&config_directory).ok()?;
+                config_directory.push(".env");
+                Some(config_directory)
+            });
 
-        let terminal_font = config_file
-            .as_ref()
-            .and_then(|config_file| fs::read_to_string(config_file).ok())
-            .unwrap_or_else(|| fallback_font.into());
-        let leaked: &'static str = Box::leak(Box::new(terminal_font.clone()));
         let oxocarbon = ColorPalette {
             foreground: String::from("#dde1e6"),
             background: String::from("#161616"),
@@ -130,14 +137,6 @@ impl App {
 
         let term_id = 0;
         let term_settings = iced_term::settings::Settings {
-            font: iced_term::settings::FontSettings {
-                size: 24.0,
-                font_type: Font {
-                    family: Family::Name(leaked),
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
             theme: iced_term::settings::ThemeSettings {
                 color_pallete: Box::new(oxocarbon),
             },
@@ -145,18 +144,59 @@ impl App {
                 program: executable_path.to_string_lossy().to_string(),
                 ..Default::default()
             },
+            ..Default::default()
         };
 
         (
             Self {
                 title: String::from("kegtui"),
                 fallback_font,
-                config_file,
+                font_config_file,
+                env_config_file,
                 term: iced_term::Terminal::new(term_id, term_settings)
                     .expect("Failed to create terminal"),
-            },
+                hide_extra_ui: false,
+            }
+            .refresh_config_owned(),
             Task::none(),
         )
+    }
+
+    fn refresh_config(&mut self) {
+        let terminal_font = self
+            .font_config_file
+            .as_ref()
+            .and_then(|config_file| fs::read_to_string(config_file).ok())
+            .unwrap_or_else(|| self.fallback_font.into());
+        let leaked: &'static str = Box::leak(Box::new(terminal_font.clone()));
+
+        let env_variables = self
+            .env_config_file
+            .as_ref()
+            .and_then(|env_config_file| {
+                env_file_reader::read_file(env_config_file).ok()
+            })
+            .unwrap_or_default();
+
+        self.term.handle(iced_term::Command::ChangeFont(
+            iced_term::settings::FontSettings {
+                size: 24.0,
+                font_type: Font {
+                    family: Family::Name(leaked),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+        ));
+        self.hide_extra_ui = env_variables
+            .get("KEGTUI_HIDE_EXTRA_UI")
+            .map(|value| value == "1")
+            .unwrap_or(false);
+    }
+
+    fn refresh_config_owned(mut self) -> Self {
+        self.refresh_config();
+        self
     }
 
     fn title(&self) -> String {
@@ -184,7 +224,7 @@ impl App {
                 }
             }
             Event::DebugEditFont => {
-                if let Some(config_file) = &self.config_file {
+                if let Some(config_file) = &self.font_config_file {
                     if !config_file.exists() {
                         let _ = fs::write(config_file, self.fallback_font);
                     }
@@ -192,30 +232,58 @@ impl App {
                 }
                 Task::none()
             }
+            Event::DebugEditEnv => {
+                if let Some(config_file) = &self.env_config_file {
+                    if !config_file.exists() {
+                        let _ = fs::write(config_file, "");
+                    }
+                    Command::new("open").arg(&config_file).spawn().ok();
+                }
+                Task::none()
+            }
+            Event::DebugRefreshConfig => {
+                self.refresh_config();
+                Task::none()
+            }
         }
     }
 
     fn view(&self) -> Element<Event, Theme, iced::Renderer> {
+        let terminal_view = TerminalView::show(&self.term).map(Event::Terminal);
         container(
-        column![
-            container(
-                text("Note: This has been ported directly from a terminal app into a GUI app, so there may be issues. Click on the app to focus if keys don't work. Vim keybinds work. Keybinds won't show if window too small.")
+            if self.hide_extra_ui {
+                column![terminal_view]
+            } else {
+                column![
+                    container(
+                        text("Note: This has been ported directly from a terminal app into a GUI app, so there may be issues. Click on the app to focus if keys don't work. Vim keybinds work. Keybinds won't show if window too small.")
+                            .width(Length::Fill)
+                            .align_x(Horizontal::Left)
+                    )
+                    .padding(4),
+                    terminal_view,
+                    container(
+                        row![
+                            text("Debug Config"),
+                            horizontal_space(),
+                            button("Edit font")
+                                .on_press(Event::DebugEditFont),
+                            button("Edit env")
+                                .on_press(Event::DebugEditEnv),
+                            button("Refresh")
+                                .on_press(Event::DebugRefreshConfig),
+                        ]
+                            .align_y(Vertical::Center)
+                            .spacing(4)
+                    )
                     .width(Length::Fill)
-                    .align_x(Horizontal::Left)
-            )
-            .padding(4),
-            TerminalView::show(&self.term).map(Event::Terminal),
-            container(
-                button("Debug: Edit font (reopen app after edit)")
-                    .on_press(Event::DebugEditFont)
-            )
-            .width(Length::Fill)
-            .align_x(Horizontal::Center)
-            .padding(4)
-        ]
-    )
-    .width(Length::Fill)
-    .height(Length::Fill)
-    .into()
+                    .align_x(Horizontal::Center)
+                    .padding(4)
+                ]
+            }
+        )
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .into()
     }
 }

@@ -26,6 +26,7 @@ iced_term = "0.6.0"
 core-foundation = "0.10.1"
 dirs = "6.0.0"
 font-kit = "0.14.3"
+env-file-reader = "0.3.0"
 
 [package]
 name = "wrapper"
@@ -39,6 +40,7 @@ iced_term.workspace = true
 core-foundation.workspace = true
 dirs.workspace = true
 font-kit.workspace = true
+env-file-reader.workspace = true
 
 [package.metadata.bundle.bin.wrapper]
 name = "kegtui"
