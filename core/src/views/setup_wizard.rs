@@ -197,7 +197,7 @@ impl View for SetupWizardView {
         _app: &mut App,
         state: &AsyncState,
         index: usize,
-    ) -> Result<Option<NavAction>> {
+    ) -> Result<Option<NavAction<'_>>> {
         let commands_to_copy = [
             commands::INSTALL_HOMEBREW,
             &format!(
@@ -214,9 +214,9 @@ impl View for SetupWizardView {
         ];
         copy_to_clipboard(
             match (state.brew_installed, state.kegworks_installed) {
-                (Some(false), Some(false)) => &commands_to_copy[index],
-                (Some(false), _) => &commands_to_copy[0],
-                (_, Some(false)) => &commands_to_copy[1],
+                (Some(false), Some(false)) => commands_to_copy[index],
+                (Some(false), _) => commands_to_copy[0],
+                (_, Some(false)) => commands_to_copy[1],
                 _ => unreachable!(),
             },
         )?;

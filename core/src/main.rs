@@ -36,25 +36,22 @@ pub mod keg_plist;
 pub mod view;
 pub mod views;
 
-fn parse_winetricks(output: &str) -> Vec<(Cow<str>, &str)> {
+fn parse_winetricks(output: &str) -> Vec<(Cow<'_, str>, &str)> {
     let mut list = vec![];
     for line in output.lines() {
-        if !line.is_empty() {
-            if let Some((lhs, rhs)) = line.split_once(' ') {
-                let lhs = lhs.trim();
-                let rhs = rhs.trim();
-                list.push((
-                    if lhs
-                        .chars()
-                        .all(|c| c == '_' || c.is_ascii_alphanumeric())
-                    {
-                        lhs.into()
-                    } else {
-                        format!("\"{lhs}\"").into()
-                    },
-                    rhs,
-                ));
-            }
+        if !line.is_empty()
+            && let Some((lhs, rhs)) = line.split_once(' ')
+        {
+            let lhs = lhs.trim();
+            let rhs = rhs.trim();
+            list.push((
+                if lhs.chars().all(|c| c == '_' || c.is_ascii_alphanumeric()) {
+                    lhs.into()
+                } else {
+                    format!("\"{lhs}\"").into()
+                },
+                rhs,
+            ));
         }
     }
     list
@@ -276,33 +273,40 @@ fn main() -> Result<()> {
     );
 
     let app_config_file_path = app_config_file_path();
-    if !app_config_file_path.try_exists().expect(&format!(
-        "Failed to check existence of {}",
-        app_config_file_path.display()
-    )) {
+    if !app_config_file_path.try_exists().unwrap_or_else(|_| {
+        panic!(
+            "Failed to check existence of {}",
+            app_config_file_path.display()
+        )
+    }) {
         let parent_directory = app_config_file_path
             .parent()
             .expect("app_config_file_path should be a full path to the file");
-        fs::create_dir_all(parent_directory).expect(&format!(
-            "Failed to create directory {}",
-            parent_directory.display()
-        ));
-        fs::write(&app_config_file_path, "").expect(&format!(
-            "Failed to create empty config file at {}",
-            app_config_file_path.display()
-        ));
+        fs::create_dir_all(parent_directory).unwrap_or_else(|_| {
+            panic!("Failed to create directory {}", parent_directory.display())
+        });
+        fs::write(&app_config_file_path, "").unwrap_or_else(|_| {
+            panic!(
+                "Failed to create empty config file at {}",
+                app_config_file_path.display()
+            )
+        });
     }
     let app_config_file_contents = fs::read_to_string(&app_config_file_path)
-        .expect(&format!(
-            "Failed to read config file {} as string",
-            app_config_file_path.display()
-        ));
-    let app_config = Arc::new(
-        toml::from_str::<AppConfig>(&app_config_file_contents).expect(
-            &format!(
-                "Failed to parse config file {}",
+        .unwrap_or_else(|_| {
+            panic!(
+                "Failed to read config file {} as string",
                 app_config_file_path.display()
-            ),
+            )
+        });
+    let app_config = Arc::new(
+        toml::from_str::<AppConfig>(&app_config_file_contents).unwrap_or_else(
+            |_| {
+                panic!(
+                    "Failed to parse config file {}",
+                    app_config_file_path.display()
+                )
+            },
         ),
     );
 

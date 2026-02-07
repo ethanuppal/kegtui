@@ -121,7 +121,7 @@ impl View for KegsView {
         app: &mut App,
         state: &AsyncState,
         index: usize,
-    ) -> Result<Option<NavAction>> {
+    ) -> Result<Option<NavAction<'_>>> {
         Ok(if !state.kegs.is_empty() {
             app.current_keg = Some((&state.kegs[index]).try_into()?);
             Some(NavAction::Push(NavID::Named("keg")))

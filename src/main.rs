@@ -1,6 +1,6 @@
 // Code from https://github.com/Harzu/iced_term
 
-use std::{collections::HashMap, fs, path::PathBuf, process::Command};
+use std::{fs, path::PathBuf, process::Command};
 
 use font_kit::source::SystemSource;
 use iced::{
@@ -8,7 +8,6 @@ use iced::{
     advanced::graphics::core::Element,
     alignment::{Horizontal, Vertical},
     font::{Family, Font},
-    padding::horizontal,
     widget::{button, column, container, row, space, text},
     window::{self, Settings},
 };
@@ -243,7 +242,7 @@ impl App {
                     if !config_file.exists() {
                         let _ = fs::write(config_file, self.fallback_font);
                     }
-                    Command::new("open").arg(&config_file).spawn().ok();
+                    Command::new("open").arg(config_file).spawn().ok();
                 }
                 Task::none()
             }
@@ -252,7 +251,7 @@ impl App {
                     if !config_file.exists() {
                         let _ = fs::write(config_file, "");
                     }
-                    Command::new("open").arg(&config_file).spawn().ok();
+                    Command::new("open").arg(config_file).spawn().ok();
                 }
                 Task::none()
             }
@@ -263,7 +262,7 @@ impl App {
         }
     }
 
-    fn view(&self) -> Element<Event, Theme, iced::Renderer> {
+    fn view(&self) -> Element<'_, Event, Theme, iced::Renderer> {
         let terminal_view = TerminalView::show(&self.term).map(Event::Terminal);
         container(
             if self.hide_extra_ui {

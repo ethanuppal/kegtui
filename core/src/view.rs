@@ -142,7 +142,7 @@ pub trait View {
         app: &mut App,
         state: &AsyncState,
         index: usize,
-    ) -> Result<Option<NavAction>> {
+    ) -> Result<Option<NavAction<'_>>> {
         let _ = (app, state, index);
         Ok(None)
     }
