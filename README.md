@@ -42,13 +42,6 @@ I aim to automate steps 2 and 3, but for now they have to be done manually.
 
 Remember to exit Steam by selecting `Kill Processes` in kegtui when you're done --- this is the equivalent of doing `Cmd-Shift-K` in Whisky.
 
-## Install (for development)
-```
-git clone https://github.com/ethanuppal/kegtui
-cd kegtui
-cargo install --path .
-```
-
 ## Usage
 
 Press `?` anywhere to view keybinds.
