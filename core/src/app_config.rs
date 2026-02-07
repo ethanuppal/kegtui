@@ -41,6 +41,14 @@ pub fn default_wrapper_search_paths() -> Vec<PathBuf> {
     .collect()
 }
 
+fn default_editor() -> String {
+    env::var("EDITOR").unwrap_or("vim".into())
+}
+
+fn default_explorer() -> String {
+    env::var("EXPLORER").unwrap_or("open".into())
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppConfig {
     #[serde(
@@ -48,4 +56,10 @@ pub struct AppConfig {
         default = "default_wrapper_search_paths"
     )]
     pub wrapper_search_paths: Vec<PathBuf>,
+
+    #[serde(default = "default_editor")]
+    pub editor: String,
+
+    #[serde(default = "default_explorer")]
+    pub explorer: String,
 }

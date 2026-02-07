@@ -13,8 +13,13 @@
 // this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
-    borrow::Cow, collections::HashMap, env, fs, io, path::Path,
-    process::Command, sync::Arc, thread,
+    borrow::Cow,
+    collections::HashMap,
+    fs, io,
+    path::{Path, PathBuf},
+    process::Command,
+    sync::Arc,
+    thread,
 };
 
 use crate::{
@@ -35,6 +40,11 @@ pub mod keg_config;
 pub mod keg_plist;
 pub mod view;
 pub mod views;
+
+fn wait_for_enter() -> Result<()> {
+    io::stdin().read_line(&mut String::new())?;
+    Ok(())
+}
 
 fn parse_winetricks(output: &str) -> Vec<(Cow<'_, str>, &str)> {
     let mut list = vec![];
@@ -57,22 +67,22 @@ fn parse_winetricks(output: &str) -> Vec<(Cow<'_, str>, &str)> {
     list
 }
 
+const KEGWORKS_WINETRICKS_SH: &str = "/tmp/kegworks_winetricks.sh";
+const KEGWORKS_WINETRICKS_CACHE_TOML: &str =
+    "/tmp/kegworks_winetricks_cache.toml";
+const KEGWORKS_WINETRICKS_EDITOR_TOML: &str = "/tmp/kegtui_winetricks.toml";
+
 pub fn winetricks(app: &mut App, _state: &AsyncState) -> Result<()> {
     let Some(current_keg) = &app.current_keg else {
         return Ok(());
     };
-
-    const KEGWORKS_WINETRICKS_SH: &str = "/tmp/kegworks_winetricks.sh";
-    const KEGWORKS_WINETRICKS_CACHE_TOML: &str =
-        "/tmp/kegworks_winetricks_cache.toml";
-    const KEGWORKS_WINETRICKS_EDITOR_TOML: &str = "/tmp/kegtui_winetricks.toml";
 
     if !Path::new(KEGWORKS_WINETRICKS_SH).is_file() {
         eprintln!("┌────────────────────────────┐");
         eprintln!("│ Fetching latest winetricks │");
         eprintln!("└────────────────────────────┘");
         Command::new("curl").args([
-        "https://raw.githubusercontent.com/Kegworks-App/winetricks/refs/heads/kegworks/src/winetricks",
+        "https://raw.githubusercontent.com/ethanuppal/winetricks/refs/heads/master/src/winetricks",
         "-o",
             KEGWORKS_WINETRICKS_SH
     ]).status()?;
@@ -144,8 +154,7 @@ pub fn winetricks(app: &mut App, _state: &AsyncState) -> Result<()> {
         fs::write(KEGWORKS_WINETRICKS_CACHE_TOML, &winetricks_toml)?;
         fs::write(KEGWORKS_WINETRICKS_EDITOR_TOML, winetricks_toml)?;
     }
-    let editor = env::var("EDITOR").unwrap_or("vim".into());
-    Command::new(editor)
+    Command::new(&app.config.editor)
         .arg(KEGWORKS_WINETRICKS_EDITOR_TOML)
         .status()?;
     let selected_winetricks: HashMap<String, HashMap<String, String>> =
@@ -169,19 +178,35 @@ pub fn winetricks(app: &mut App, _state: &AsyncState) -> Result<()> {
     Ok(())
 }
 
+pub fn clear_winetricks_cache(
+    _app: &mut App,
+    _state: &AsyncState,
+) -> Result<()> {
+    eprintln!("┌──────────────────────────────────┐");
+    eprintln!("│ Press enter to return to the TUI │");
+    eprintln!("└──────────────────────────────────┘");
+    for file in [
+        KEGWORKS_WINETRICKS_SH,
+        KEGWORKS_WINETRICKS_CACHE_TOML,
+        KEGWORKS_WINETRICKS_EDITOR_TOML,
+    ] {
+        if PathBuf::from(file).try_exists()? {
+            fs::remove_file(file)?;
+            eprintln!("rm {file}");
+        }
+    }
+    wait_for_enter()?;
+
+    Ok(())
+}
+
 pub fn open_c_drive(app: &mut App, _state: &AsyncState) -> Result<()> {
     let Some(current_keg) = &app.current_keg else {
         return Ok(());
     };
-    if let Ok(explorer) = env::var("EXPLORER") {
-        Command::new(explorer)
-            .arg(current_keg.c_drive.to_string_lossy().to_string())
-            .status()?;
-    } else {
-        Command::new("open")
-            .arg(current_keg.c_drive.to_string_lossy().to_string())
-            .status()?;
-    }
+    Command::new(&app.config.explorer)
+        .arg(current_keg.c_drive.to_string_lossy().to_string())
+        .status()?;
     Ok(())
 }
 
@@ -191,8 +216,7 @@ pub fn edit_config(app: &mut App, _state: &AsyncState) -> Result<()> {
             toml::to_string_pretty(&current_keg.plist.extract_config())?;
         let file = "/tmp/kegtui.toml";
         fs::write(file, toml_config)?;
-        let editor = env::var("EDITOR").unwrap_or("vim".into());
-        Command::new(editor).arg(file).status()?;
+        Command::new(&app.config.editor).arg(file).status()?;
         let new_toml_config = toml::from_str(&fs::read_to_string(file)?)?;
         current_keg.plist.update_from_config(&new_toml_config);
         plist::to_file_xml(&current_keg.config_file, &current_keg.plist)?;
@@ -210,7 +234,7 @@ pub fn launch_keg(app: &mut App, _state: &AsyncState) -> Result<()> {
         thread::spawn(move || {
             let _ = Command::new(wrapper).status();
         });
-        io::stdin().read_line(&mut String::new())?;
+        wait_for_enter()?;
     }
     Ok(())
 }
@@ -248,6 +272,10 @@ fn main() -> Result<()> {
         "main",
         [
             MenuItem::new("Kegs", MenuItemAction::LoadView(kegs_view)),
+            MenuItem::new(
+                "Clear Winetricks Cache",
+                MenuItemAction::External(clear_winetricks_cache),
+            ),
             MenuItem::new("Credits", MenuItemAction::LoadView(credits_view)),
         ],
     );
