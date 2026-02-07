@@ -66,6 +66,7 @@ There is experimental configuration using the Debug Config menu at the bottom of
 
 - `KEGTUI_HIDE_EXTRA_UI=1` hides this debug UI (you can still make config changes from the Application Support folder)
 - `KEGTUI_FONT_SIZE` changes the font size
+- `KEGTUI_EXIT_ON_TERMINAL_SHUTDOWN=0` does not quit the app if the terminal shuts down
 
 ## Support [GCenx](https://github.com/Gcenx) / [Kegworks][kegworks].
 
