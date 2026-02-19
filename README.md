@@ -1,7 +1,7 @@
 # kegtui
 
 > [!WARNING]
-> kegtui does **NOT** create wrappers or claim legal rights to them. kegtui is **NOT** a substitute for using [Kegworks][kegworks] to create wrappers.
+> kegtui does **NOT** create wrappers or engines or claim legal rights to them. kegtui is **NOT** a substitute for using [Kegworks][kegworks] to obtain wrappers or engines. However, kegtui can assemble wrappers and engines into a keg.
 
 Terminal interface for [Kegworks][kegworks].
 
@@ -69,4 +69,4 @@ Please support him in any way possible!
 - https://paypal.me/gcenx
 - https://ko-fi.com/gcenx
 
-[kegworks]: https://github.com/Kegworks-App/Kegworks
+[kegworks]: https://github.com/Sikarugir-App/Sikarugir

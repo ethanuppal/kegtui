@@ -14,4 +14,3 @@
 
 pub mod credits;
 pub mod kegs;
-pub mod setup_wizard;
