@@ -562,7 +562,10 @@ pub fn spawn_worker(
                         .path()
                         .file_name()
                         .and_then(|name| name.to_str())
-                        .map(|name| name.ends_with(".tar.7z"))
+                        .map(|name| {
+                            name.ends_with(".tar.7z")
+                                || name.ends_with(".tar.xz")
+                        })
                         .unwrap_or(false)
                     {
                         engines.push(Engine { path: entry.path() });
