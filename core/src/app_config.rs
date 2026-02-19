@@ -12,10 +12,7 @@
 // You should have received a copy of the GNU General Public License along with
 // this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    env,
-    path::{Path, PathBuf},
-};
+use std::{env, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -33,8 +30,8 @@ pub fn app_config_file_path() -> PathBuf {
         .join(CONFIG_FILE_NAME)
 }
 
-pub fn default_keg_location() -> &'static Path {
-    Path::new("~/Applications/kegtui")
+pub fn default_keg_location() -> &'static str {
+    "~/Applications/kegtui"
 }
 
 pub fn default_keg_search_paths() -> Vec<PathBuf> {
@@ -43,9 +40,7 @@ pub fn default_keg_search_paths() -> Vec<PathBuf> {
         "~/Applications/",
         "~/Applications/Kegworks/",
         "~/Applications/Sikarugir/",
-        default_keg_location()
-            .to_str()
-            .expect("Bug: default_keg_location should be a valid UTF-8 path"),
+        default_keg_location(),
     ]
     .into_iter()
     .map(PathBuf::from)

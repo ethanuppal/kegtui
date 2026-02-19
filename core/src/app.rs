@@ -36,7 +36,6 @@ use symbols::line::VERTICAL;
 
 use crate::{
     app_config::AppConfig,
-    checks,
     keg::{CurrentKeg, Engine, Keg, Wrapper},
     view::prelude::*,
 };
@@ -517,7 +516,7 @@ fn read_search_paths(
         .map(move |enclosing_location| {
             enclosing_location
                 .to_string_lossy()
-                .replace("~", &home_directory)
+                .replace("~", home_directory)
         })
         .filter_map(|fixed_enclosing_location| {
             fs::read_dir(fixed_enclosing_location).ok()

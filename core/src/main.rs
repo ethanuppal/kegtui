@@ -15,23 +15,31 @@
 use std::{
     borrow::Cow,
     collections::HashMap,
+    env,
     ffi::OsStr,
     fmt::Write,
-    fs, io,
+    fs::{self, File},
+    io,
+    os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     process::Command,
     sync::Arc,
     thread,
+    time::Duration,
 };
 
 use crate::{
     app::App,
-    app_config::{AppConfig, app_config_file_path},
+    app_config::{AppConfig, app_config_file_path, default_keg_location},
     view::{MenuItem, MenuItemAction, NavContext},
 };
 use app::{AsyncState, spawn_worker};
-use color_eyre::Result;
+use color_eyre::{Result, eyre::Context};
+use copy_dir::copy_dir;
+use tar::Archive;
 use view::NavAction;
+use walkdir::WalkDir;
+use xz2::read::XzDecoder;
 
 pub mod app;
 pub mod app_config;
@@ -49,6 +57,7 @@ fn wait_for_enter() -> Result<()> {
 
 fn prompt(prompt: &str, validate: impl Fn(&str) -> bool) -> Result<String> {
     use std::io::Write;
+
     let mut buffer = String::new();
     loop {
         print!("{prompt}");
@@ -59,6 +68,27 @@ fn prompt(prompt: &str, validate: impl Fn(&str) -> bool) -> Result<String> {
         }
     }
     Ok(buffer)
+}
+
+fn spawn_thread_with_spinner<T: Send + 'static>(
+    message: &str,
+    work: impl FnOnce() -> Result<T> + Send + 'static,
+) -> Result<T> {
+    use std::io::Write;
+
+    let spinner = ["|", "/", "-", "\\"];
+    let mut i = 0;
+    let thread = thread::spawn(work);
+    print!("\x1B[?25l");
+    while !thread.is_finished() {
+        print!("{} {message}\r", spinner[i % spinner.len()]);
+        io::stdout().flush()?;
+        thread::sleep(Duration::from_millis(50));
+        i += 1;
+    }
+    print!("\x1B[?25h");
+    println!("  {message}");
+    thread.join().expect("Thread panicked")
 }
 
 fn read_multiline_input(
@@ -288,7 +318,7 @@ pub fn create_keg(app: &mut App, state: &AsyncState) -> Result<()> {
     for engine in &state.engines {
         writeln!(&mut creator_txt, "# {}", engine.path.display())?;
     }
-    writeln!(&mut creator_txt, "")?;
+    writeln!(&mut creator_txt)?;
     for wrapper in &state.wrappers {
         writeln!(&mut creator_txt, "# {}", wrapper.path.display())?;
     }
@@ -326,7 +356,7 @@ pub fn create_keg(app: &mut App, state: &AsyncState) -> Result<()> {
             if ["y", "Y"].contains(&answer) {
                 action = Action::EngineAndWrapper {
                     engine: potential_engine.to_owned(),
-                    wrapper: potential_engine.to_owned(),
+                    wrapper: potential_wrapper.to_owned(),
                 };
                 break;
             } else if answer == "q" {
@@ -338,7 +368,125 @@ pub fn create_keg(app: &mut App, state: &AsyncState) -> Result<()> {
 
     match action {
         Action::EngineAndWrapper { engine, wrapper } => {
-            todo!("Make wrapper");
+            let home_directory = env::var("HOME")
+                .expect("User missing home directory env variable");
+            let keg_directory = PathBuf::from(
+                default_keg_location().replace("~", &home_directory),
+            );
+            fs::create_dir_all(&keg_directory)
+                .context("Failed to create keg directory")?;
+
+            let mut keg_path;
+            loop {
+                let name = prompt("Name (can be changed later): ", |_| true)?;
+                keg_path = keg_directory.join(format!("{}.app", name.trim()));
+                if keg_path.try_exists().context(
+                    "Failed to check if new keg location exists already",
+                )? {
+                    println!("{} already exists", keg_path.display());
+                } else {
+                    break;
+                }
+            }
+
+            let engine_path = Path::new(&engine);
+            let wrapper_path = Path::new(&wrapper);
+
+            copy_dir(wrapper_path, &keg_path).context(format!(
+                "Failed to copy wrapper ({wrapper}) to keg path ({})",
+                keg_path.display()
+            ))?;
+            println!("  Copied template {wrapper} to {}", keg_path.display());
+
+            const TMP_ENGINE: &str = "/tmp/kegtui_engine.tar";
+            if Path::new(TMP_ENGINE).try_exists()? {
+                fs::remove_file(TMP_ENGINE)
+                    .context("Failed to remove temporary engine file")?;
+            }
+
+            let engine_pathbuf = engine_path.to_owned();
+            spawn_thread_with_spinner(
+                &format!("Decoding {engine} to {TMP_ENGINE}..."),
+                move || {
+                    let engine_xz = File::open(engine_pathbuf)
+                        .context("Failed to open engine tarball")?;
+                    let mut engine_tmp = File::create(TMP_ENGINE)
+                        .context("Failed to create temporary engine file")?;
+                    io::copy(&mut XzDecoder::new(engine_xz), &mut engine_tmp)
+                        .context("Failed to decode engine XZ")?;
+                    Ok(())
+                },
+            )?;
+
+            let keg_path_copy = keg_path.clone();
+            let wine_folder = spawn_thread_with_spinner(
+                &format!(
+                    "Unpacking {TMP_ENGINE} into {}...",
+                    keg_path.display()
+                ),
+                move || {
+                    let engine_tmp = File::open(TMP_ENGINE)
+                        .context("Failed to create temporary engine file")?;
+                    let mut archive = Archive::new(engine_tmp);
+                    let parent = keg_path_copy.join("Contents/SharedSupport");
+                    fs::create_dir_all(&parent).context(
+                        "Failed to create directory in keg to place engine",
+                    )?;
+                    archive
+                        .unpack(&parent)
+                        .context("Failed to move engine into keg")?;
+                    let unpacked_folder = parent.join("wswine.bundle"); // Not sure how to programmatically determine this
+                    let wine_folder = parent.join("wine");
+                    fs::rename(unpacked_folder, &wine_folder)?;
+                    Ok(wine_folder)
+                },
+            )?;
+
+            let permissions = fs::Permissions::from_mode(0o777);
+            for entry in WalkDir::new(&keg_path) {
+                if let Ok(entry) = entry
+                    && entry.file_type().is_file()
+                {
+                    fs::set_permissions(entry.path(), permissions.clone())?;
+                }
+            }
+            fs::set_permissions(wine_folder, permissions)?;
+
+            for entry in WalkDir::new(&keg_path) {
+                if let Ok(entry) = entry
+                    && entry.file_type().is_file()
+                {
+                    let _ = xattrs::remove_xattr(
+                        entry.path(),
+                        "com.apple.quarantine",
+                    );
+                }
+            }
+            let _ =
+                xattrs::remove_xattr(keg_path.clone(), "com.apple.quarantine");
+
+            let output =
+                Command::new(keg_path.join("Contents/MacOS/wineskinlauncher"))
+                    .arg("WSS-wineprefixcreate")
+                    .spawn()?
+                    .wait_with_output()?;
+
+            if !output.status.success() {
+                use std::io::Write;
+
+                eprintln!("FAILED");
+                eprintln!("== STDOUT ==");
+                io::stdout().write_all(&output.stdout)?;
+                eprintln!("== STDERR ==");
+                io::stdout().write_all(&output.stderr)?;
+                eprintln!("\nPlease try again");
+            } else {
+                eprintln!("┌──────────────────────────────────┐");
+                eprintln!("│ Created your keg!                │");
+                eprintln!("│ Press enter to return to the TUI │");
+                eprintln!("└──────────────────────────────────┘");
+            }
+            wait_for_enter()?;
         }
         Action::Quit => {
             eprintln!("Quitting Keg creator");
