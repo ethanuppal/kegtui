@@ -231,6 +231,9 @@ pub fn winetricks(app: &mut App, _state: &AsyncState) -> Result<()> {
             list.extend(map.1.keys());
             list
         });
+    if !current_keg.winetricks_logfile.try_exists()? {
+        fs::write(&current_keg.winetricks_logfile, "")?;
+    }
     if !selected_winetricks.is_empty() {
         let mut console = Command::new("open")
             .arg(&current_keg.winetricks_logfile)
