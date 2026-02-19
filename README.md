@@ -43,8 +43,18 @@ Once you've opened the app, here's how to setup Steam:
 3. Now, go to the kegs section. If you don't see your new keg, quit and reopen the app.
 4. Install Steam via winetricks. You can do this via kegtui by choosing `Winetricks` and then uncommenting the line starting with `# steam.app = `. Then, save and quit the file. The winetricks file will be opened by default in your `$EDITOR`; if you didn't define this, it'll open in plain Vim.
 5. Verify that Steam is installed by choosing `Open C Drive` and navigating to the steam installation folder in `Program Files (x86)`.
-5. Once Steam is installed, choose `Edit Config` and set the program path to `"/Program Files (x86)/Steam/Steam.exe"`.
-6. Finally, you should be able to `Launch` the wrapper and use Steam as normal.
+5. Once Steam is installed, choose `Edit Config` and set the program path to `"/Program Files (x86)/Steam/Steam.exe"`. You should also enable a graphics translation like DXMT. Only enable ONE graphics translation. For example:
+    ```toml
+    [translation]
+    d3d_metal = false
+    dxvk = false
+    dxmt = true
+    molten_vkcx = true
+    fast_math = false
+    advertise_avx = true
+    metal_hud = true
+    ```
+6. Finally, you should be able to `Launch` the keg and use Steam as normal.
 <!-- 3. Open kegtui, navigate to the wrapper you just created, and `Launch` it. If all goes well, you should see the Kegworks GUI config menu open. Close this window once it has opened. Back in kegtui, run `Kill Processes`. -->
 
 Remember to exit Steam by selecting `Kill Processes` in kegtui when you're done --- this is the equivalent of doing `Cmd-Shift-K` in Whisky.
@@ -54,6 +64,11 @@ Remember to exit Steam by selecting `Kill Processes` in kegtui when you're done 
 > See the "Config" section for more information.
 
 ## Config
+
+### Each Keg
+
+The menu for each keg has an `Edit Config` option.
+Use this to, for instance, enable DXMT for games.
 
 ### Core App
 
