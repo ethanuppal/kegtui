@@ -10,7 +10,7 @@ WRAPPER_DOWNLOAD_NAME="Wineskin-3.1.6.tar.xz"
 WRAPPER_DOWNLOAD_PATH="$ARTIFACTS_FOLDER/$WRAPPER_DOWNLOAD_NAME"
 WRAPPER_URL="https://github.com/Sikarugir-App/Wrapper/releases/download/v1.0/$WRAPPER_DOWNLOAD_NAME"
 
-ENGINE_DOWNLOAD_NAME="WS12WineCX24.0.7_7.tar.xz"
+ENGINE_DOWNLOAD_NAME="WS12WineSikarugir10.0_4.tar.xz"
 ENGINE_DOWNLOAD_PATH="$ARTIFACTS_FOLDER/$ENGINE_DOWNLOAD_NAME"
 ENGINE_URL="https://github.com/Sikarugir-App/Engines/releases/download/v1.0/$ENGINE_DOWNLOAD_NAME"
 
@@ -35,7 +35,7 @@ printf "\e[0m"
 /bin/mkdir -p "$ENGINE_FOLDER" || fail "Failed to create folder for engines"
 printf "\e[1m"
 
-echo "=> Downloading Wineskin wrapper version 3.1.6"
+echo "=> Downloading wrapper"
 
 printf "\e[0m"
 /usr/bin/curl -L "$WRAPPER_URL" > "$WRAPPER_DOWNLOAD_PATH" \
@@ -43,7 +43,7 @@ printf "\e[0m"
 
 printf "\e[1m"
 
-echo "=> Downloading engine version CX24.0.7_7"
+echo "=> Downloading engine"
 
 printf "\e[0m"
 /usr/bin/curl -L "$ENGINE_URL" > "$ENGINE_DOWNLOAD_PATH" \

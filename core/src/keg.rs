@@ -28,6 +28,8 @@ pub struct Keg {
     pub wineskin_launcher: OsString,
     pub c_drive: PathBuf,
     pub log_directory: PathBuf,
+    pub winetricks_logfile: PathBuf,
+    pub wine_prefix: PathBuf,
 }
 
 #[derive(Debug, Clone)]
@@ -47,6 +49,8 @@ pub struct CurrentKeg {
     pub plist: KegPlist,
     pub config_file: PathBuf,
     pub log_directory: PathBuf,
+    pub winetricks_logfile: PathBuf,
+    pub wine_prefix: PathBuf,
 }
 
 impl Keg {
@@ -62,11 +66,14 @@ impl Keg {
                 .expect("Missing Keg name")
                 .to_path_buf(),
             config_file: path.join("Contents/Info.plist"),
-            c_drive: path.join("Contents/drive_c"),
+            c_drive: path.join("Contents/SharedSupport/prefix/drive_c"),
             wineskin_launcher: path
                 .join("Contents/MacOS/wineskinLauncher")
                 .into_os_string(),
             log_directory: path.join("Contents/Logs"),
+            winetricks_logfile: path
+                .join("Contents/SharedSupport/Logs/Winetricks.log"),
+            wine_prefix: path.join("Contents/SharedSupport/wine/bin"),
         }
     }
 }
@@ -82,6 +89,8 @@ impl TryFrom<&Keg> for CurrentKeg {
             plist: plist::from_file(&value.config_file)?,
             config_file: value.config_file.clone(),
             log_directory: value.log_directory.clone(),
+            winetricks_logfile: value.winetricks_logfile.clone(),
+            wine_prefix: value.wine_prefix.clone(),
         })
     }
 }

@@ -199,9 +199,9 @@ impl<'a> App<'a> {
             .direction(Direction::Horizontal)
             .constraints(
                 [
-                    Constraint::Percentage(25),
+                    Constraint::Length(26),
                     Constraint::Length(1),
-                    Constraint::Percentage(74),
+                    Constraint::Fill(1),
                 ]
                 .as_ref(),
             )
