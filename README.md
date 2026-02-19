@@ -59,7 +59,7 @@ Once you've opened the app, here's how to setup Steam:
 
 Remember to exit Steam by selecting `Kill Processes` in kegtui when you're done --- this is the equivalent of doing `Cmd-Shift-K` in Whisky.
 
-> ![NOTE]
+> [!NOTE]
 > If you use a different shell than the native shell, you'll have to configure it in the environment.
 > See the "Config" section for more information.
 
