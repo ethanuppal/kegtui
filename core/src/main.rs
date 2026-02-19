@@ -313,7 +313,7 @@ pub fn create_keg(app: &mut App, state: &AsyncState) -> Result<()> {
     eprintln!("└─────────────┘");
 
     let mut creator_txt = String::from(
-        "# Uncomment the engine and wrapper to use\n# Save and quit your editor to select\n# Select nothing to quit\n\n",
+        "# Uncomment the engine and wrapper to use\n# Save and quit your editor to select\n# Select nothing to quit\n# If you don't see new engines or wrappers here, reopen kegtui\n\n",
     );
     for engine in &state.engines {
         writeln!(&mut creator_txt, "# {}", engine.path.display())?;
@@ -496,6 +496,32 @@ pub fn create_keg(app: &mut App, state: &AsyncState) -> Result<()> {
     Ok(())
 }
 
+fn setup_wizard(_app: &mut App, _state: &AsyncState) -> Result<()> {
+    const COMMAND: &str = "curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/ethanuppal/kegtui/refs/heads/main/download.sh | sh";
+
+    eprintln!("┌──────────────┐");
+    eprintln!("│ Setup wizard │");
+    eprintln!("└──────────────┘");
+    println!("kegtui will now run the following command:");
+    println!("  {COMMAND}");
+
+    let answer = prompt("Is this ok? [yY/nN] ", |answer| {
+        ["y", "Y", "n", "N"].contains(&answer.trim())
+    })?;
+    let answer = answer.trim();
+
+    if ["y", "Y"].contains(&answer) {
+        Command::new("sh").args(["-c", COMMAND]).spawn()?.wait()?;
+
+        eprintln!("┌──────────────────────────────────┐");
+        eprintln!("│ Press enter to return to the TUI │");
+        eprintln!("└──────────────────────────────────┘");
+        wait_for_enter()?;
+    }
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let mut context = NavContext::default();
 
@@ -510,6 +536,10 @@ fn main() -> Result<()> {
             MenuItem::new(
                 "Clear Winetricks Cache",
                 MenuItemAction::External(clear_winetricks_cache),
+            ),
+            MenuItem::new(
+                "Setup Wizard",
+                MenuItemAction::External(setup_wizard),
             ),
             MenuItem::new("Credits", MenuItemAction::LoadView(credits_view)),
         ],
