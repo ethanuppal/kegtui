@@ -11,20 +11,24 @@ Terminal interface for [Kegworks][kegworks].
 
 ### First-time setup
 
-After clicking on this button and downloading, you'll have to open it by right-clicking on it from Finder:
+After clicking on this button and downloading the latest release, you should now have a `.dmg` downloaded:
 
-![Right click on the app and then click Open](./images/how-to-open-first-time.png)
+![DMG with kegtui.app and the Applications folder](./images/dmg.png)
 
-Subsequent opens won't require this step.
+Now, drag the `kegtui.app` into your applications folder.
 
-If you drag the app into your Applications folder, you can open it via Spotlight.
+Next, open your Terminal app. Please see the [instructions provided by Apple](https://support.apple.com/en-ng/guide/terminal/apd5265185d-f365-44cb-8b09-71a064a42125/mac) if you do not know how to do this.
 
-> [!TIP]
-> If you get an alert saying that the `.app` is damaged, run the following command:
-> ```bash
-> xattr -d com.apple.quarantine <path/to/kegtui.app>
-> ```
-> Now you can open the app without issues.
+Inside Terminal, type the following command and press enter.
+```bash
+xattr -d com.apple.quarantine /Applications/kegtui.app
+```
+After this step, you can close Terminal.
+
+Now, open the app from your applications folder or by typing its name into Spotlight.
+The app should look like this:
+
+![The app start screen](./images/first-time-open.png)
 
 ## Usage
 
@@ -32,9 +36,7 @@ Press `?` anywhere to view keybinds.
 
 ### Setup
 
-Once you've opened the app, you'll see a bunch of options:
-
-![The app start screen](./images/first-time-open.png)
+Once you've opened the app, here's how to setup Steam:
 
 1. Run the setup wizard.
 2. Create a new keg using the wrapper and engine downloaded from the setup wizard. If you don't see them, quit and reopen the app.
