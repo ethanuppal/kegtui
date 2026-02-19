@@ -1,6 +1,11 @@
 // Code from https://github.com/Harzu/iced_term
 
-use std::{fs, path::PathBuf, process::Command};
+use std::{
+    collections::HashMap,
+    fs, io,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 use font_kit::source::SystemSource;
 use iced::{
@@ -80,10 +85,19 @@ fn font_exists(font_name: &str) -> bool {
     source.select_family_by_name(font_name).is_ok()
 }
 
+fn read_env_file(env_config_file: Option<&Path>) -> HashMap<String, String> {
+    env_config_file
+        .as_ref()
+        .and_then(|env_config_file| {
+            env_file_reader::read_file(env_config_file).ok()
+        })
+        .unwrap_or_default()
+}
+
 impl App {
     fn new() -> (Self, Task<Event>) {
-        let mut executable_path = resources_root().unwrap_or_default();
-        executable_path.push(TUI_EXECUTABLE);
+        let executable_path =
+            resources_root().unwrap_or_default().join(TUI_EXECUTABLE);
 
         let fallback_font = if font_exists("Hack Nerd Font Mono") {
             "Hack Nerd Font Mono"
@@ -137,6 +151,34 @@ impl App {
             dim_white: String::from("#b4b7ba"),
         };
 
+        let shell = read_env_file(env_config_file.as_deref())
+            .get("SHELL")
+            .map(|inner| inner.to_owned())
+            .unwrap_or_else(|| {
+                std::env::var("SHELL")
+                    .expect("User has not set SHELL in their env")
+            })
+            .to_string();
+
+        let mut env = HashMap::default();
+        for (key, value) in
+            [("COLORTERM", "truecolor"), ("TERM", "screen-256color")]
+        {
+            env.insert(key.to_owned(), value.to_owned());
+        }
+        for key in ["XDG_CONFIG_HOME", "EXPLORER", "EDITOR"] {
+            if let Ok(stdout) = Command::new(&shell)
+                .args(["-c", &format!("/usr/bin/env | /usr/bin/grep {key}")])
+                .output()
+                .and_then(|output| {
+                    String::from_utf8(output.stdout).map_err(io::Error::other)
+                })
+                && let Some((_, value)) = stdout.trim().split_once('=')
+            {
+                env.insert(key.to_owned(), value.to_owned());
+            }
+        }
+
         let term_id = 0;
         let term_settings = iced_term::settings::Settings {
             theme: iced_term::settings::ThemeSettings {
@@ -144,6 +186,7 @@ impl App {
             },
             backend: iced_term::settings::BackendSettings {
                 program: executable_path.to_string_lossy().to_string(),
+                env,
                 ..Default::default()
             },
             ..Default::default()
@@ -173,14 +216,7 @@ impl App {
             .unwrap_or_else(|| self.fallback_font.into());
         let leaked: &'static str = Box::leak(Box::new(terminal_font.clone()));
 
-        let env_variables = self
-            .env_config_file
-            .as_ref()
-            .and_then(|env_config_file| {
-                env_file_reader::read_file(env_config_file).ok()
-            })
-            .unwrap_or_default();
-
+        let env_variables = read_env_file(self.env_config_file.as_deref());
         self.term.handle(iced_term::Command::ChangeFont(
             iced_term::settings::FontSettings {
                 size: env_variables

@@ -82,7 +82,7 @@ impl View for KegsView {
                 .cloned()
                 .map(|keg| {
                     ListItem::new(Span::from(format!(
-                        "{} (under {})",
+                        "{} ({})",
                         keg.name,
                         keg.enclosing_location.display()
                     )))

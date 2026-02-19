@@ -98,7 +98,10 @@ fn read_multiline_input(
 ) -> Result<String> {
     let editor_file = editor_file.as_ref();
     fs::write(editor_file, initial)?;
-    Command::new(&app.config.editor).arg(editor_file).status()?;
+    Command::new(&app.config.editor)
+        .arg(editor_file)
+        .spawn()?
+        .wait()?;
     let contents = fs::read_to_string(editor_file)?;
     Ok(contents)
 }
@@ -139,11 +142,19 @@ pub fn winetricks(app: &mut App, _state: &AsyncState) -> Result<()> {
         eprintln!("│ Fetching latest winetricks │");
         eprintln!("└────────────────────────────┘");
         Command::new("curl").args([
-        "https://raw.githubusercontent.com/ethanuppal/winetricks/refs/heads/master/src/winetricks",
-        "-o",
+            "https://raw.githubusercontent.com/ethanuppal/winetricks/refs/heads/master/src/winetricks",
+            "-o",
             KEGWORKS_WINETRICKS_SH
-    ]).status()?;
+        ]).status()?;
     }
+    fs::copy(
+        KEGWORKS_WINETRICKS_SH,
+        current_keg.wine_prefix.join("winetricks"),
+    )?;
+    fs::set_permissions(
+        current_keg.wine_prefix.join("winetricks"),
+        fs::Permissions::from_mode(0o777),
+    )?;
 
     let initial = if let Ok(winetricks_toml_cached) =
         fs::read_to_string(KEGWORKS_WINETRICKS_CACHE_TOML)
@@ -222,7 +233,7 @@ pub fn winetricks(app: &mut App, _state: &AsyncState) -> Result<()> {
         });
     if !selected_winetricks.is_empty() {
         let mut console = Command::new("open")
-            .arg(current_keg.log_directory.join("Winetricks.log"))
+            .arg(&current_keg.winetricks_logfile)
             .spawn()?;
         Command::new(&current_keg.wineskin_launcher)
             .arg("WSS-winetricks")
