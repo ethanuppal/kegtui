@@ -14,6 +14,7 @@
 
 use std::{
     env, fs, io,
+    path::PathBuf,
     sync::{self, Arc, RwLock},
     thread,
     time::{Duration, Instant},
@@ -36,7 +37,7 @@ use symbols::line::VERTICAL;
 use crate::{
     app_config::AppConfig,
     checks,
-    keg::{CurrentKeg, Keg},
+    keg::{CurrentKeg, Engine, Keg, Wrapper},
     view::prelude::*,
 };
 
@@ -495,8 +496,8 @@ impl<'a> App<'a> {
 #[derive(Default)]
 pub struct AsyncState {
     pub kegs: Vec<Keg>,
-    pub brew_installed: Option<bool>,
-    pub kegworks_installed: Option<bool>,
+    pub engines: Vec<Engine>,
+    pub wrappers: Vec<Wrapper>,
 }
 
 pub struct TerminateWorkerGuard(sync::mpsc::Sender<()>);
@@ -505,6 +506,23 @@ impl Drop for TerminateWorkerGuard {
     fn drop(&mut self) {
         let _ = self.0.send(());
     }
+}
+
+fn read_search_paths(
+    search_paths: &[PathBuf],
+    home_directory: &str,
+) -> impl Iterator<Item = fs::DirEntry> {
+    search_paths
+        .iter()
+        .map(move |enclosing_location| {
+            enclosing_location
+                .to_string_lossy()
+                .replace("~", &home_directory)
+        })
+        .filter_map(|fixed_enclosing_location| {
+            fs::read_dir(fixed_enclosing_location).ok()
+        })
+        .flat_map(|read_dir| read_dir.flatten())
 }
 
 pub fn spawn_worker(
@@ -521,34 +539,55 @@ pub fn spawn_worker(
                 if quit_rx.try_recv().is_ok() {
                     break;
                 }
+
                 let mut kegs = vec![];
+                let mut engines = vec![];
+                let mut wrappers = vec![];
+
                 let home_directory = env::var("HOME")
                     .expect("User missing home directory env variable");
-                for enclosing_location in &config.wrapper_search_paths {
-                    let fixed_enclosing_location = enclosing_location
-                        .to_string_lossy()
-                        .replace("~", &home_directory);
-                    if let Ok(read_dir) = fs::read_dir(fixed_enclosing_location)
+
+                for entry in
+                    read_search_paths(&config.keg_search_paths, &home_directory)
+                {
+                    if entry.path().join("Contents/KegworksConfig.app").exists()
                     {
-                        for entry in read_dir.flatten() {
-                            if entry
-                                .path()
-                                .join("Contents/KegworksConfig.app")
-                                .exists()
-                            {
-                                kegs.push(Keg::from_path(&entry.path()));
-                            }
-                        }
+                        kegs.push(Keg::from_path(&entry.path()));
+                    }
+                }
+                for entry in read_search_paths(
+                    &config.engine_search_paths,
+                    &home_directory,
+                ) {
+                    if entry
+                        .path()
+                        .file_name()
+                        .and_then(|name| name.to_str())
+                        .map(|name| name.ends_with(".tar.7z"))
+                        .unwrap_or(false)
+                    {
+                        engines.push(Engine { path: entry.path() });
+                    }
+                }
+                for entry in read_search_paths(
+                    &config.wrapper_search_paths,
+                    &home_directory,
+                ) {
+                    if entry
+                        .path()
+                        .file_name()
+                        .and_then(|name| name.to_str())
+                        .map(|name| name.ends_with(".app"))
+                        .unwrap_or(false)
+                    {
+                        wrappers.push(Wrapper { path: entry.path() });
                     }
                 }
 
-                let brew_installed = checks::is_brew_installed();
-                let kegworks_installed = checks::is_kegworks_installed();
-
                 if let Ok(mut lock) = async_state.try_write() {
                     lock.kegs = kegs;
-                    lock.brew_installed = Some(brew_installed);
-                    lock.kegworks_installed = Some(kegworks_installed);
+                    lock.engines = engines;
+                    lock.wrappers = wrappers;
                 }
 
                 thread::sleep(Duration::from_secs(1));

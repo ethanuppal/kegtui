@@ -45,7 +45,7 @@ impl View for KegsView {
     ) -> Result<()> {
         let search_locations = oxford_comma(
             app.config
-                .wrapper_search_paths
+                .keg_search_paths
                 .iter()
                 .map(|path| path.to_string_lossy().to_string())
                 .collect(),

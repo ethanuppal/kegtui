@@ -22,11 +22,22 @@ use crate::keg_plist::KegPlist;
 #[derive(Debug, Clone)]
 pub struct Keg {
     pub name: String,
+    /// The parent folder of the keg `.app` used only for display purposes.
     pub enclosing_location: PathBuf,
     pub config_file: PathBuf,
     pub wineskin_launcher: OsString,
     pub c_drive: PathBuf,
     pub log_directory: PathBuf,
+}
+
+#[derive(Debug, Clone)]
+pub struct Engine {
+    pub path: PathBuf,
+}
+
+#[derive(Debug, Clone)]
+pub struct Wrapper {
+    pub path: PathBuf,
 }
 
 pub struct CurrentKeg {

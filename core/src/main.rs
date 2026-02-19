@@ -15,6 +15,8 @@
 use std::{
     borrow::Cow,
     collections::HashMap,
+    ffi::OsStr,
+    fmt::Write,
     fs, io,
     path::{Path, PathBuf},
     process::Command,
@@ -28,7 +30,6 @@ use crate::{
     view::{MenuItem, MenuItemAction, NavContext},
 };
 use app::{AsyncState, spawn_worker};
-use checks::is_kegworks_installed;
 use color_eyre::Result;
 use view::NavAction;
 
@@ -44,6 +45,32 @@ pub mod views;
 fn wait_for_enter() -> Result<()> {
     io::stdin().read_line(&mut String::new())?;
     Ok(())
+}
+
+fn prompt(prompt: &str, validate: impl Fn(&str) -> bool) -> Result<String> {
+    use std::io::Write;
+    let mut buffer = String::new();
+    loop {
+        print!("{prompt}");
+        io::stdout().flush()?;
+        io::stdin().read_line(&mut buffer)?;
+        if validate(&buffer) {
+            break;
+        }
+    }
+    Ok(buffer)
+}
+
+fn read_multiline_input(
+    app: &App,
+    initial: &str,
+    editor_file: impl AsRef<OsStr>,
+) -> Result<String> {
+    let editor_file = editor_file.as_ref();
+    fs::write(editor_file, initial)?;
+    Command::new(&app.config.editor).arg(editor_file).status()?;
+    let contents = fs::read_to_string(editor_file)?;
+    Ok(contents)
 }
 
 fn parse_winetricks(output: &str) -> Vec<(Cow<'_, str>, &str)> {
@@ -88,10 +115,10 @@ pub fn winetricks(app: &mut App, _state: &AsyncState) -> Result<()> {
     ]).status()?;
     }
 
-    if let Ok(winetricks_toml_template) =
+    let initial = if let Ok(winetricks_toml_cached) =
         fs::read_to_string(KEGWORKS_WINETRICKS_CACHE_TOML)
     {
-        fs::write(KEGWORKS_WINETRICKS_EDITOR_TOML, winetricks_toml_template)?;
+        winetricks_toml_cached
     } else {
         eprintln!("┌─────────────────────────────┐");
         eprintln!("│ Loading winetricks apps     │");
@@ -152,13 +179,12 @@ pub fn winetricks(app: &mut App, _state: &AsyncState) -> Result<()> {
             ));
         }
         fs::write(KEGWORKS_WINETRICKS_CACHE_TOML, &winetricks_toml)?;
-        fs::write(KEGWORKS_WINETRICKS_EDITOR_TOML, winetricks_toml)?;
-    }
-    Command::new(&app.config.editor)
-        .arg(KEGWORKS_WINETRICKS_EDITOR_TOML)
-        .status()?;
+        winetricks_toml
+    };
+    let result =
+        read_multiline_input(app, &initial, KEGWORKS_WINETRICKS_EDITOR_TOML)?;
     let selected_winetricks: HashMap<String, HashMap<String, String>> =
-        toml::from_str(&fs::read_to_string(KEGWORKS_WINETRICKS_EDITOR_TOML)?)?;
+        toml::from_str(&result)?;
     let selected_winetricks =
         selected_winetricks.iter().fold(vec![], |mut list, map| {
             list.extend(map.1.keys());
@@ -251,19 +277,79 @@ pub fn kill_wineserver(app: &mut App, _state: &AsyncState) -> Result<()> {
     Ok(())
 }
 
+pub fn create_keg(app: &mut App, state: &AsyncState) -> Result<()> {
+    eprintln!("┌─────────────┐");
+    eprintln!("│ Keg creator │");
+    eprintln!("└─────────────┘");
+
+    let mut creator_txt = String::from(
+        "# Uncomment the engine and wrapper to use\n# Save and quit your editor to select\n# Select nothing to quit\n\n",
+    );
+    for engine in &state.engines {
+        writeln!(&mut creator_txt, "# {}", engine.path.display())?;
+    }
+    writeln!(&mut creator_txt, "")?;
+    for wrapper in &state.wrappers {
+        writeln!(&mut creator_txt, "# {}", wrapper.path.display())?;
+    }
+
+    enum Action {
+        EngineAndWrapper { engine: String, wrapper: String },
+        Quit,
+    }
+
+    let action;
+    loop {
+        let choices =
+            read_multiline_input(app, &creator_txt, "/tmp/kegcreator.txt")?;
+
+        let engine_and_wrapper = choices
+            .lines()
+            .map(|line| line.trim())
+            .filter(|line| !line.is_empty() && !line.starts_with("#"))
+            .collect::<Vec<_>>();
+
+        if engine_and_wrapper.is_empty() {
+            action = Action::Quit;
+            break;
+        } else if engine_and_wrapper.len() == 2 {
+            let potential_engine = engine_and_wrapper[0];
+            let potential_wrapper = engine_and_wrapper[1];
+            println!("You have selected:");
+            println!("  Engine:  {potential_engine}");
+            println!("  Wrapper: {potential_wrapper}");
+            let answer = prompt("Is this correct? [yY/nN/q] ", |answer| {
+                ["y", "Y", "n", "N", "q"].contains(&answer.trim())
+            })?;
+            let answer = answer.trim();
+
+            if ["y", "Y"].contains(&answer) {
+                action = Action::EngineAndWrapper {
+                    engine: potential_engine.to_owned(),
+                    wrapper: potential_engine.to_owned(),
+                };
+                break;
+            } else if answer == "q" {
+                action = Action::Quit;
+                break;
+            }
+        }
+    }
+
+    match action {
+        Action::EngineAndWrapper { engine, wrapper } => {
+            todo!("Make wrapper");
+        }
+        Action::Quit => {
+            eprintln!("Quitting Keg creator");
+        }
+    }
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let mut context = NavContext::default();
-
-    let setup_wizard_view =
-        context.view("wizard", &views::setup_wizard::SetupWizardView);
-
-    let setup_wizard_nav = context.nav(
-        "wizard",
-        [MenuItem::new(
-            "Setup Wizard",
-            MenuItemAction::LoadView(setup_wizard_view),
-        )],
-    );
 
     let kegs_view = context.view("kegs", &views::kegs::KegsView);
     let credits_view = context.view("credits", &views::credits::CreditsView);
@@ -272,6 +358,7 @@ fn main() -> Result<()> {
         "main",
         [
             MenuItem::new("Kegs", MenuItemAction::LoadView(kegs_view)),
+            MenuItem::new("Create Keg", MenuItemAction::External(create_keg)),
             MenuItem::new(
                 "Clear Winetricks Cache",
                 MenuItemAction::External(clear_winetricks_cache),
@@ -345,11 +432,7 @@ fn main() -> Result<()> {
     let mut terminal = ratatui::init();
     let app_result = App::new(&app_config).run(
         &mut context,
-        if is_kegworks_installed() {
-            main_nav
-        } else {
-            setup_wizard_nav
-        },
+        main_nav,
         &mut terminal,
         async_state,
     );

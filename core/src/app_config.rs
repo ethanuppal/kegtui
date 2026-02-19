@@ -12,7 +12,10 @@
 // You should have received a copy of the GNU General Public License along with
 // this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{env, path::PathBuf};
+use std::{
+    env,
+    path::{Path, PathBuf},
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -30,11 +33,39 @@ pub fn app_config_file_path() -> PathBuf {
         .join(CONFIG_FILE_NAME)
 }
 
-pub fn default_wrapper_search_paths() -> Vec<PathBuf> {
+pub fn default_keg_location() -> &'static Path {
+    Path::new("~/Applications/kegtui")
+}
+
+pub fn default_keg_search_paths() -> Vec<PathBuf> {
     [
         "/Applications",
         "~/Applications/",
         "~/Applications/Kegworks/",
+        "~/Applications/Sikarugir/",
+        default_keg_location()
+            .to_str()
+            .expect("Bug: default_keg_location should be a valid UTF-8 path"),
+    ]
+    .into_iter()
+    .map(PathBuf::from)
+    .collect()
+}
+
+pub fn default_engine_search_paths() -> Vec<PathBuf> {
+    [
+        "~/Library/Application Support/Kegworks/Engines/",
+        "~/Library/Application Support/Sikarugir/Engines/",
+    ]
+    .into_iter()
+    .map(PathBuf::from)
+    .collect()
+}
+
+pub fn default_wrapper_search_paths() -> Vec<PathBuf> {
+    [
+        "~/Library/Application Support/Kegworks/Wrapper/",
+        "~/Library/Application Support/Sikarugir/Wrapper/",
     ]
     .into_iter()
     .map(PathBuf::from)
@@ -51,6 +82,18 @@ fn default_explorer() -> String {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppConfig {
+    /// Directories with full Kegworks wrappers.
+    #[serde(rename = "keg-search-paths", default = "default_keg_search_paths")]
+    pub keg_search_paths: Vec<PathBuf>,
+
+    /// Directories with Kegworks engines.
+    #[serde(
+        rename = "engine-search-paths",
+        default = "default_engine_search_paths"
+    )]
+    pub engine_search_paths: Vec<PathBuf>,
+
+    /// Directories with template Kegworks wrappers.
     #[serde(
         rename = "wrapper-search-paths",
         default = "default_wrapper_search_paths"
