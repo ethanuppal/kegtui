@@ -6,7 +6,7 @@ ARTIFACTS_FOLDER="/tmp/kegworks_download"
 WRAPPER_FOLDER="$HOME/Library/Application Support/Sikarugir/Wrapper"
 ENGINE_FOLDER="$HOME/Library/Application Support/Sikarugir/Engines"
 
-WRAPPER_DOWNLOAD_NAME="Wineskin-3.1.6.tar.xz"
+WRAPPER_DOWNLOAD_NAME="Template-1.0.10.tar.xz"
 WRAPPER_DOWNLOAD_PATH="$ARTIFACTS_FOLDER/$WRAPPER_DOWNLOAD_NAME"
 WRAPPER_URL="https://github.com/Sikarugir-App/Wrapper/releases/download/v1.0/$WRAPPER_DOWNLOAD_NAME"
 
