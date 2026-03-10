@@ -44,7 +44,12 @@ Once you've opened the app, here's how to setup Steam:
 4. Install the Windows version of Steam: <https://store.steampowered.com/about/download>.
     Choose `Open C Drive` and then drag `SteamSetup.exe` into `Program Files (x86)/`.
     You can do this via kegtui by choosing `Edit Config` and set the program path to `"/Program Files (x86)/SteamSetup.exe"`.
-    If that does not work, choose `Winetricks` and then uncomment the line starting with `# steam.app = `. Then, save and quit the file. The winetricks file will be opened by default in your `$EDITOR`; if you didn't define this, it'll open in plain Vim.
+    Then, `Launch` the keg.
+
+    If that does not work, choose `Winetricks` and then uncomment the line starting with `# steam.app = `.
+    Then, save and quit the file.
+    The winetricks file will be opened by default in your `$EDITOR`; if you didn't define this, it'll open in plain Vim.
+    You may have a glitch where you cannot see the cursor.
 5. Verify that Steam is installed by choosing `Open C Drive` and navigating to the steam installation folder in `Program Files (x86)`.
 5. Once Steam is installed, choose `Edit Config` and set the program path to `"/Program Files (x86)/Steam/Steam.exe"`. You should also enable a graphics translation like DXMT. Only enable ONE graphics translation. For example:
     ```toml
@@ -58,7 +63,6 @@ Once you've opened the app, here's how to setup Steam:
     metal_hud = true
     ```
 6. Finally, you should be able to `Launch` the keg and use Steam as normal.
-<!-- 3. Open kegtui, navigate to the wrapper you just created, and `Launch` it. If all goes well, you should see the Kegworks GUI config menu open. Close this window once it has opened. Back in kegtui, run `Kill Processes`. -->
 
 Remember to exit Steam by selecting `Kill Processes` in kegtui when you're done --- this is the equivalent of doing `Cmd-Shift-K` in Whisky.
 
