@@ -16,7 +16,7 @@ use std::{
     borrow::Cow,
     collections::HashMap,
     env,
-    ffi::OsStr,
+    ffi::{OsStr, OsString},
     fmt::Write,
     fs::{self, File},
     io,
@@ -304,8 +304,19 @@ pub fn launch_keg(app: &mut App, _state: &AsyncState) -> Result<()> {
         thread::spawn(move || {
             let _ = Command::new(wrapper).status();
         });
+        app.open_kegs_wineskin_launchers
+            .insert(current_keg.wineskin_launcher.clone());
         wait_for_enter()?;
     }
+    Ok(())
+}
+
+fn kill_wineserver_via_wineskin_launcher(
+    wineskin_launcher: &OsString,
+) -> Result<()> {
+    Command::new(wineskin_launcher)
+        .arg("WSS-wineserverkill")
+        .status()?;
     Ok(())
 }
 
@@ -314,9 +325,27 @@ pub fn kill_wineserver(app: &mut App, _state: &AsyncState) -> Result<()> {
         eprintln!("┌─────────────────────────────────────────┐");
         eprintln!("│ Killing processes spawned from this keg │");
         eprintln!("└─────────────────────────────────────────┘");
-        Command::new(&current_keg.wineskin_launcher)
-            .arg("WSS-wineserverkill")
-            .status()?;
+        kill_wineserver_via_wineskin_launcher(&current_keg.wineskin_launcher)?;
+        app.open_kegs_wineskin_launchers
+            .remove(&current_keg.wineskin_launcher);
+    }
+    Ok(())
+}
+
+fn kill_all_wineservers(app: &mut App, _state: &AsyncState) -> Result<()> {
+    if app.open_kegs_wineskin_launchers.is_empty() {
+        eprintln!("┌──────────────────────────────────┐");
+        eprintln!("│ No kegs opened                   │");
+        eprintln!("│ Press enter to return to the TUI │");
+        eprintln!("└──────────────────────────────────┘");
+        wait_for_enter()?;
+    } else {
+        eprintln!("┌─────────────────────────────────────────┐");
+        eprintln!("│ Killing all processes spawned from kegs │");
+        eprintln!("└─────────────────────────────────────────┘");
+        for wineskin_launcher in app.open_kegs_wineskin_launchers.drain() {
+            kill_wineserver_via_wineskin_launcher(&wineskin_launcher)?;
+        }
     }
     Ok(())
 }
@@ -547,6 +576,10 @@ fn main() -> Result<()> {
         [
             MenuItem::new("Kegs", MenuItemAction::LoadView(kegs_view)),
             MenuItem::new("Create Keg", MenuItemAction::External(create_keg)),
+            MenuItem::new(
+                "Kill All Kegs",
+                MenuItemAction::External(kill_all_wineservers),
+            ),
             MenuItem::new(
                 "Clear Winetricks Cache",
                 MenuItemAction::External(clear_winetricks_cache),

@@ -13,7 +13,10 @@
 // this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
-    env, fs, io,
+    collections::HashSet,
+    env,
+    ffi::OsString,
+    fs, io,
     path::PathBuf,
     sync::{self, Arc, RwLock},
     thread,
@@ -123,6 +126,8 @@ pub struct App<'a> {
     pub current_keg: Option<CurrentKeg>,
     pub config: &'a AppConfig,
     show_keybinds_modal: bool,
+    /// The paths to wineskin launchers of open kegs.
+    pub open_kegs_wineskin_launchers: HashSet<OsString>,
 }
 
 impl<'a> App<'a> {
@@ -136,6 +141,7 @@ impl<'a> App<'a> {
             current_keg: Default::default(),
             config,
             show_keybinds_modal: Default::default(),
+            open_kegs_wineskin_launchers: Default::default(),
         }
     }
 
