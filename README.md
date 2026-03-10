@@ -41,7 +41,10 @@ Once you've opened the app, here's how to setup Steam:
 1. Run the setup wizard.
 2. Create a new keg using the wrapper and engine downloaded from the setup wizard. If you don't see them, quit and reopen the app.
 3. Now, go to the kegs section. If you don't see your new keg, quit and reopen the app.
-4. Install Steam via winetricks. You can do this via kegtui by choosing `Winetricks` and then uncommenting the line starting with `# steam.app = `. Then, save and quit the file. The winetricks file will be opened by default in your `$EDITOR`; if you didn't define this, it'll open in plain Vim.
+4. Install the Windows version of Steam: <https://store.steampowered.com/about/download>.
+    Choose `Open C Drive` and then drag `SteamSetup.exe` into `Program Files (x86)/`.
+    You can do this via kegtui by choosing `Edit Config` and set the program path to `"/Program Files (x86)/SteamSetup.exe"`.
+    If that does not work, choose `Winetricks` and then uncomment the line starting with `# steam.app = `. Then, save and quit the file. The winetricks file will be opened by default in your `$EDITOR`; if you didn't define this, it'll open in plain Vim.
 5. Verify that Steam is installed by choosing `Open C Drive` and navigating to the steam installation folder in `Program Files (x86)`.
 5. Once Steam is installed, choose `Edit Config` and set the program path to `"/Program Files (x86)/Steam/Steam.exe"`. You should also enable a graphics translation like DXMT. Only enable ONE graphics translation. For example:
     ```toml
