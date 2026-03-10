@@ -48,7 +48,7 @@ jobs:
         with:
           tag_name: dev-${{ steps.commit.outputs.hash }}
           name: kegtui-v${{ steps.version.outputs.version }}-${{ steps.commit.outputs.hash }}
-          files: kegtui-v${{ steps.version.outputs.version }}.dmg
+          files: kegtui.dmg
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
