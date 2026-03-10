@@ -18,6 +18,7 @@ jobs:
         with:
           targets: x86_64-apple-darwin
       - uses: Swatinem/rust-cache@v2
+      - run: brew install jq
 
       # - uses: cargo-bins/cargo-binstall@main
       # - run: cargo binstall -y cargo-bundle
@@ -39,13 +40,16 @@ jobs:
       - name: Get commit hash
         id: commit
         run: echo "hash=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+      - name: Get project version
+        id: version
+        run: echo "version=$(cargo metadata --format-version=1 --no-deps | jq .packages[0].version)" >> $GITHUB_OUTPUT
       - name: Create release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: dev-${{ steps.commit.outputs.hash }}
-          name: dev-${{ steps.commit.outputs.hash }}
-          files: kegtui.dmg
-          prerelease: true
+          name: kegtui-v${{ steps.version.outputs.version }}-${{ steps.commit.outputs.hash }}
+          files: kegtui-v${{ steps.version.outputs.version }}.dmg
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
