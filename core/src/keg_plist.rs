@@ -33,10 +33,15 @@ mod bool_as_int {
     }
 }
 
+fn default_advertise_avx() -> bool {
+    true
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct KegPlist {
     #[serde(rename = "ADVERTISE_AVX")]
     #[serde(with = "bool_as_int")]
+    #[serde(default = "default_advertise_avx")]
     pub advertise_avx: bool,
 
     #[serde(rename = "Associations")]

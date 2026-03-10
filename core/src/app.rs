@@ -550,6 +550,10 @@ pub fn spawn_worker(
                     read_search_paths(&config.keg_search_paths, &home_directory)
                 {
                     if entry.path().join("Contents/KegworksConfig.app").exists()
+                        || entry
+                            .path()
+                            .join("Contents/MacOS/Sikarugir")
+                            .exists()
                     {
                         kegs.push(Keg::from_path(&entry.path()));
                     }
